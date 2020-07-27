@@ -1,75 +1,29 @@
-use std::io::{Read, Write};
-use std::net::{Shutdown, TcpListener, TcpStream};
+extern crate dbus;
+
+use dbus::{ blocking::LocalConnection, tree::Factory };
 use std::process::{Command, Stdio};
+use std::time::Duration;
 
-enum DmenuCommand {
-    Pipe(Vec<String>),
-    SetName(),
-}
+const DBUS_NAME: &'static str = "com.gale.mandwm";
 
-fn handle_streams(stream: &mut TcpStream) {
-    let mut buf: Vec<u8> = Vec::with_capacity(1024);
-
-    stream.write(b"Connection received.").unwrap();
-
-    while match stream.read_to_end(&mut buf) {
-        Ok(_size) => {
-            println!("{}", std::str::from_utf8(&buf).unwrap());
-
-            let commands = create_dmenu_commands(&buf).expect("Failed to get args.");
-
-            true
-        }
-        Err(e) => {
-            eprintln!("TCP Read Error: {:#?}", e);
-            false
-        }
-    } {}
-
-    println!("TCP stream is being shutdown");
-    stream.shutdown(Shutdown::Both).unwrap();
-}
-
-fn create_dmenu_commands<'a>(buffer: &[u8]) -> Result<Vec<DmenuCommand>, std::io::Error> {
-    let mut args: Vec<DmenuCommand> = Vec::new();
-
-    if args.len() <= 0 {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Could not parse commands.",
-        ))
-    } else {
-        Ok(args)
-    }
-}
-
-fn main() -> std::io::Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _args: Vec<String> = std::env::args().collect();
 
-    /*
-    let child = Command::new("dmenu")
-            .stdin(Stdio::inherit())
-            .spawn()
-            .expect("Could not start dmenu-manager");
-    */
+    let conn = LocalConnection::new_session()?;
 
-    let listener = TcpListener::bind("127.0.0.1:5000")?;
+    conn.request_name(DBUS_NAME, false, true, false)?;
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(mut stream) => {
-                std::thread::spawn(move || {
-                    handle_streams(&mut stream);
-                });
-            }
-            Err(e) => {
-                eprintln!("{}", e);
-            }
-        }
+    let factory = Factory::new_fn::<()>();
+
+    let proxy = conn.with_proxy("org.freedesktop.DBus", "/", Duration::from_millis(5000));
+
+    let (names,): (Vec<String>,) = proxy.method_call("org.freedesktop.DBus", "ListNames", ())?;
+
+    for name in names {
+        println!("{:?}", name);
     }
 
-    drop(listener);
+    conn.release_name(DBUS_NAME)?;
 
     Ok(())
-    // println!("{}", String::from_utf8(child.stdout).unwrap());
 }
