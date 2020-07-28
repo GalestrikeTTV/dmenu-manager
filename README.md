@@ -1,4 +1,5 @@
-# dmenu/dwm Manager
+# Mandwm
+## A dwm and dmenu daemon
 This wip daemon will allow an application to be able to interact with features in suckless tools.
 
 ## Features
