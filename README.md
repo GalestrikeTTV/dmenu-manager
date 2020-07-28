@@ -5,10 +5,10 @@ This wip daemon will allow an application to be able to interact with features i
 None currently
 
 ## Planned Features
-Pipe into dmenu and then execute a process rather than returning a string.
-Set the dwm title bar, append an item, and cycle through alternate title bar names.
-Allow applications to send notifications/warnings through the title bar.
-Provide a Rust API to be able to send messages easily in Rust apps.
+* Pipe into dmenu and then execute a process rather than returning a string.
+* Set the dwm title bar, append an item, and cycle through alternate title bar names.
+* Allow applications to send notifications/warnings through the title bar.
+* Provide a Rust API to be able to send messages easily in Rust apps.
 
 ## Dependencies
-dbus
+dbus, rustc and cargo

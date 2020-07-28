@@ -1,10 +1,6 @@
-[package]
-name = "mandwm"
-version = "0.1.0"
-authors = ["Tristan Zander <knavetnz@gmail.com>"]
-edition = "2018"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-dbus = "0.8.4"
+members = [
+    "mandwm",
+    "mandwm-api"
+]

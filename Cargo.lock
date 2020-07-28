@@ -11,13 +11,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dmenu-manager"
-version = "0.1.0"
-dependencies = [
- "dbus",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -30,6 +23,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc12a3bc971424edbbf7edaf6e5740483444db63aa8e23d3751ff12a30f306f0"
 dependencies = [
  "pkg-config",
+]
+
+[[package]]
+name = "mandwm"
+version = "0.1.0"
+dependencies = [
+ "mandwm-api",
+]
+
+[[package]]
+name = "mandwm-api"
+version = "0.1.0"
+dependencies = [
+ "dbus",
 ]
 
 [[package]]
