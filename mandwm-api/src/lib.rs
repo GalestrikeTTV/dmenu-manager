@@ -1,34 +1,40 @@
 #[cfg(test)]
 mod tests;
 
+pub mod core;
+
 extern crate dbus;
-use dbus::{ blocking::LocalConnection, tree::Factory };
+use dbus::{blocking::LocalConnection, tree::Factory};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
 const DBUS_NAME: &'static str = "com.gale.mandwm";
 
-#[no_mangle]
-pub fn set_primary_string(primary: &str) {
-    println!("{}: {}", DBUS_NAME, primary);
+pub mod log {
+    use crate::DBUS_NAME;
+
+    pub fn log_info<T: Into<String>>(message: T) {
+        println!("{} - Info: {}", DBUS_NAME, message.into());
+    }
+
+    pub fn log_debug<T: Into<String>>(message: T) {
+        println!("{} - Debug: {}", DBUS_NAME, message.into());
+    }
+
+    pub fn log_warn<T: Into<String>>(message: T) {
+        println!("{} - WARN: {}", DBUS_NAME, message.into());
+    }
+
+    pub fn log_critical<T: Into<String>>(message: T) {
+        println!("{} - CRITICAL: {}", DBUS_NAME, message.into());
+    }
 }
 
-pub fn init_mandwm() -> Result<(), Box<dyn std::error::Error>> {
-    let _args: Vec<String> = std::env::args().collect();
+/// Since this doesn't take self, this must connect to dbus before
+/// sending the string
+#[no_mangle]
+pub fn set_primary_string(primary: &str) {
 
-    let conn = LocalConnection::new_session()?;
 
-    conn.request_name(DBUS_NAME, false, true, false)?;
-
-    let _factory = Factory::new_fn::<()>();
-
-    let proxy = conn.with_proxy("org.freedesktop.DBus", "/", Duration::from_millis(5000));
-
-    let (names,): (Vec<String>,) = proxy.method_call("org.freedesktop.DBus", "ListNames", ())?;
-    for name in names {
-        println!("{:?}", name);
-
-    }
-    conn.release_name(DBUS_NAME)?;
-    Ok(())
+    println!("{}: {}", DBUS_NAME, primary);
 }
