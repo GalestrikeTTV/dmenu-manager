@@ -11,9 +11,8 @@ license = "MIT"
 [features]
 default = ["bus"]
 
+core = []
 bus = ["dbus"]
-core = ["mandwm-core"]
 
 [dependencies]
 dbus = { version = "0.8.4", optional = true }
-mandwm-core = { path = "../mandwm-core", optional = true}

@@ -1,5 +1,3 @@
-pub use mandwm_core::*;
-
 use crate::log::*;
 /// The module `core` is used to initialize a session mandwm,
 /// if it doesn't already exist
@@ -8,8 +6,9 @@ use crate::DBUS_NAME;
 use MandwmErrorLevel::*;
 
 use dbus::{blocking::LocalConnection, tree::Factory};
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
+use std::sync::{ Arc, Mutex };
 
 #[derive(Debug)]
 pub struct MandwmError {
@@ -63,6 +62,13 @@ pub struct MandwmCore {
 }
 
 impl MandwmCore {
+    pub fn setup_mandwm() -> Result<MandwmCore, Box<dyn std::error::Error>> {
+        // We'll do something with this later, just to make sure we're running as daemon or something.
+        let _args: Vec<String> = std::env::args().collect();
+
+        Ok(MandwmCore::default())
+    }
+
     /// Called once the MandwmCore object is initialized.
     pub fn connect(mut self) -> Result<Self, MandwmError> {
         let conn = match LocalConnection::new_session() {
@@ -96,12 +102,13 @@ impl MandwmCore {
             println!("{:?}", name);
         }
         match conn.release_name(DBUS_NAME) {
-            Ok(_) => { self.is_running = true; }
+            Ok(_) => {
+                self.is_running = true;
+            }
             Err(e) => {
-                return Err(MandwmError::warn(
-                    format!("Could not release name of {}. ERROR: {}",
-                    DBUS_NAME,
-                    e,
+                return Err(MandwmError::warn(format!(
+                    "Could not release name of {}. ERROR: {}",
+                    DBUS_NAME, e,
                 )));
             }
         };
@@ -113,21 +120,25 @@ impl MandwmCore {
         self.is_running
     }
 
+    fn set_running(&mut self, run: bool) {
+        self.is_running = run;
+    }
+
     pub fn set_delimiter<T: Into<String>>(mut self, delimiter: T) -> Self {
         self.delimiter = delimiter.into();
         self
     }
 
     pub fn set_primary_string<T: Into<String>>(&mut self, message: T) {
-       if self.dwm_bar_string.len() >= 1 {
-           self.dwm_bar_string[0] = message.into();
-       } else {
+        if self.dwm_bar_string.len() >= 1 {
+            self.dwm_bar_string[0] = message.into();
+        } else {
             self.dwm_bar_string.push(message.into());
-       }
-       println!("Primary string set.");
+        }
+        println!("Primary string set.");
     }
 
-    pub fn append<T: Into<String>>(&mut self, place: AppendTo,  message: T) {
+    pub fn append<T: Into<String>>(&mut self, place: AppendTo, message: T) {
         use AppendTo::*;
 
         let append_message = message.into();
@@ -141,27 +152,35 @@ impl MandwmCore {
             FIRST => {
                 // Append to first part of the list.
                 self.dwm_bar_string.insert(0, append_message);
-            },
+            }
             LAST => {
                 // Append to the end of the list
                 self.dwm_bar_string.push(append_message);
-            },
+            }
             SHORTEST => {
                 // Append to the shortest list
-                unimplemented!("MandwmCore does not contain a way to know which list is where yet.");
-            },
+                unimplemented!(
+                    "MandwmCore does not contain a way to know which list is where yet."
+                );
+            }
             NEXT => {
                 // Append to the next available spot
-                unimplemented!("MandwmCore does not contain a way to know which list is where yet.");
-            },
+                unimplemented!(
+                    "MandwmCore does not contain a way to know which list is where yet."
+                );
+            }
         }
     }
 
+    pub fn run(core: Arc<Mutex<MandwmCore>>) {
 
-    pub fn run(&self) -> thread::JoinHandle<()> {
-        return thread::spawn(|| {
+        core.lock().unwrap().set_running(true);
+
+        thread::spawn(move || {
             thread::sleep(Duration::from_secs(5));
             println!("Mandwm has finished running");
+
+            core.lock().unwrap().set_running(false);
         });
     }
 }
@@ -176,11 +195,4 @@ impl Default for MandwmCore {
             max_length: 50,
         }
     }
-}
-
-pub fn setup_mandwm() -> Result<MandwmCore, Box<dyn std::error::Error>> {
-    // We'll do something with this later, just to make sure we're running as daemon or something.
-    let _args: Vec<String> = std::env::args().collect();
-
-    Ok(MandwmCore::default())
 }
