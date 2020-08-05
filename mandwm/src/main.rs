@@ -16,7 +16,9 @@ fn main() {
     // Maybe spin this off into another thread so we can check for messages on a loop.
     let thread = mandwm.run();
 
-    thread.join().unwrap();
+    while mandwm.is_running() == true {
+       println!("Mandwm is running.");
+    }
 
     log_critical("This app is not finished so getting here is pointless :(");
 }

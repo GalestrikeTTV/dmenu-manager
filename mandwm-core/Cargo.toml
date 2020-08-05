@@ -1,11 +1,9 @@
 [package]
-name = "mandwm"
+name = "mandwm-core"
 version = "0.1.0"
-authors = ["Tristan Zander <tristannzander@gmail.com>"]
+authors = ["gale"]
 edition = "2018"
-license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mandwm-api = { path = "../mandwm-api", features = ["core"] }

@@ -37,7 +37,12 @@ name = "mandwm-api"
 version = "0.1.0"
 dependencies = [
  "dbus",
+ "mandwm-core",
 ]
+
+[[package]]
+name = "mandwm-core"
+version = "0.1.0"
 
 [[package]]
 name = "pkg-config"

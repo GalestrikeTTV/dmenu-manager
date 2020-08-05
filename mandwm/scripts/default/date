@@ -1,0 +1,2 @@
+# Format this however you see fit.
+date +'%b %d %Y'

@@ -1,0 +1,2 @@
+# Change this to fit your needs
+date +'%I:%M:%S %p %Z'

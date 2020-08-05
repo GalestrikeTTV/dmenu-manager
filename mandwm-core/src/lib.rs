@@ -1,5 +1,3 @@
-pub use mandwm_core::*;
-
 use crate::log::*;
 /// The module `core` is used to initialize a session mandwm,
 /// if it doesn't already exist

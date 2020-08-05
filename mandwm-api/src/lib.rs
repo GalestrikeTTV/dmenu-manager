@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "core")]
 pub mod core;
 
 extern crate dbus;
@@ -32,9 +33,9 @@ pub mod log {
 
 /// Since this doesn't take self, this must connect to dbus before
 /// sending the string
+// TODO No mangle for the sake of FFI (?)
 #[no_mangle]
 pub fn set_primary_string(primary: &str) {
-
 
     println!("{}: {}", DBUS_NAME, primary);
 }

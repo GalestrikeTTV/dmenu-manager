@@ -1,0 +1,4 @@
+# You'll have to change this if your setup uses something other than upower
+upower -i `upower -e | grep 'BAT'` | grep percentage
+
+# I'm still learning bash so this could be done better
