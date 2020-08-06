@@ -23,7 +23,7 @@ fn main() {
     MandwmCore::run(Arc::clone(&mandwm_mutex));
 
     while mandwm_mutex.lock().unwrap().is_running() == true {
-       println!("Mandwm is running.");
+       log_info("Mandwm is running.");
        thread::sleep(Duration::new(1, 0));
     }
 

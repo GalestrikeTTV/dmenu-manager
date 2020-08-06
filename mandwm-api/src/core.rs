@@ -6,9 +6,10 @@ use crate::DBUS_NAME;
 use MandwmErrorLevel::*;
 
 use dbus::{blocking::LocalConnection, tree::Factory};
+use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use std::sync::{ Arc, Mutex };
 
 #[derive(Debug)]
 pub struct MandwmError {
@@ -58,6 +59,7 @@ pub struct MandwmCore {
     pub dwm_bar_string: Vec<String>,
     pub delimiter: String,
     is_running: bool,
+    should_close: bool,
     max_length: usize,
 }
 
@@ -135,7 +137,7 @@ impl MandwmCore {
         } else {
             self.dwm_bar_string.push(message.into());
         }
-        println!("Primary string set.");
+        log_debug("Primary string set.");
     }
 
     pub fn append<T: Into<String>>(&mut self, place: AppendTo, message: T) {
@@ -173,14 +175,45 @@ impl MandwmCore {
     }
 
     pub fn run(core: Arc<Mutex<MandwmCore>>) {
-
         core.lock().unwrap().set_running(true);
 
         thread::spawn(move || {
             thread::sleep(Duration::from_secs(5));
-            println!("Mandwm has finished running");
+
+            log_debug("Starting mandwm.");
+
+            while core.lock().unwrap().should_close == false {
+                // Check for dbus messages
+
+                let mut command = Command::new("xsetroot");
+                command.arg("-name");
+
+                let dwm_bar_string = core.lock().unwrap().dwm_bar_string.clone();
+                let delimiter = core.lock().unwrap().delimiter.clone();
+                let mut final_string = String::new();
+
+                for (i, bar_string) in dwm_bar_string.iter().enumerate() {
+                    if i >= dwm_bar_string.len() || i == 0 {
+                        final_string.push_str(bar_string.as_str());
+                    } else {
+                        final_string.push_str(format!(" {} {}", delimiter, bar_string).as_str());
+                    }
+                }
+
+                command.arg(format!("\"{}\"", final_string));
+
+                let output = command.output().unwrap();
+
+                if output.stderr.len() > 0 {
+                    log_critical(String::from_utf8(output.stderr.to_vec()).unwrap());
+                }
+
+                thread::sleep(Duration::from_secs(1));
+            }
 
             core.lock().unwrap().set_running(false);
+
+            log_debug("Mandwm has finished running");
         });
     }
 }
@@ -191,6 +224,7 @@ impl Default for MandwmCore {
             dwm_bar_string: Vec::new(),
             delimiter: " | ".to_string(),
             is_running: false,
+            should_close: false,
             // TODO find a way to figure this out from dwm
             max_length: 50,
         }
