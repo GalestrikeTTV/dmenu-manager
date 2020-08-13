@@ -10,6 +10,7 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+use std::path::{ Path, PathBuf };
 
 #[derive(Debug)]
 pub struct MandwmError {
@@ -57,7 +58,9 @@ pub enum AppendTo {
 
 pub struct MandwmCore {
     pub dwm_bar_string: Vec<String>,
-    pub delimiter: String,
+    default_scripts: Vec<Command>,
+    scripts_path: PathBuf,
+    delimiter: String,
     is_running: bool,
     should_close: bool,
     max_length: usize,
@@ -131,6 +134,22 @@ impl MandwmCore {
         self
     }
 
+    pub fn set_default_scripts(mut self, slice: &[&str], path: PathBuf) -> Self {
+        use std::fs::read_dir;
+
+        // TODO Cache default scripts (create a command and clone them into a vec?)
+
+        let res = read_dir("./").unwrap()
+            .map(|res| res.map(|e| e.path()))
+            .collect::<Result<Vec<_>, std::io::Error>>().unwrap();
+
+        for path in res.iter() {
+            log_debug(path);
+        }
+
+        self
+    }
+
     pub fn set_primary_string<T: Into<String>>(&mut self, message: T) {
         if self.dwm_bar_string.len() >= 1 {
             self.dwm_bar_string[0] = message.into();
@@ -140,15 +159,14 @@ impl MandwmCore {
         log_debug("Primary string set.");
     }
 
+
     pub fn append<T: Into<String>>(&mut self, place: AppendTo, message: T) {
         use AppendTo::*;
 
         let append_message = message.into();
 
-        // TODO later
         // Change this so that it appends whatever message was sent
         // after the set delimiter
-        log_debug("MandwmCore.append is currently unimplemented.");
 
         match place {
             FIRST => {
@@ -178,12 +196,11 @@ impl MandwmCore {
         core.lock().unwrap().set_running(true);
 
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(5));
-
             log_debug("Starting mandwm.");
 
             while core.lock().unwrap().should_close == false {
                 // Check for dbus messages
+                //  <=== TODO
 
                 let mut command = Command::new("xsetroot");
                 command.arg("-name");
@@ -200,7 +217,7 @@ impl MandwmCore {
                     }
                 }
 
-                command.arg(format!("\"{}\"", final_string));
+                command.arg(format!(" {} ", final_string));
 
                 let output = command.output().unwrap();
 
@@ -223,6 +240,8 @@ impl Default for MandwmCore {
         MandwmCore {
             dwm_bar_string: Vec::new(),
             delimiter: " | ".to_string(),
+            default_scripts: vec![],
+            scripts_path: PathBuf::new(),
             is_running: false,
             should_close: false,
             // TODO find a way to figure this out from dwm

@@ -8,6 +8,7 @@ use mandwm_api::log::*;
 fn main() {
     let mut mandwm = MandwmCore::setup_mandwm().unwrap()
         .set_delimiter("|")
+        .set_default_scripts(&["time", "date", "power"], std::path::PathBuf::from("./"))
         .connect().unwrap();
 
     mandwm.set_primary_string("By default, mandwm only displays time and date.");
@@ -24,7 +25,7 @@ fn main() {
 
     while mandwm_mutex.lock().unwrap().is_running() == true {
        log_info("Mandwm is running.");
-       thread::sleep(Duration::new(1, 0));
+       thread::sleep(Duration::new(10, 0));
     }
 
     log_critical("This app is not finished so getting here is pointless :(");
