@@ -1,8 +1,13 @@
 extern crate mandwm_api;
+extern crate dbus;
+
+pub use mandwm_api::DBUS_NAME;
+
+mod core;
 
 use std::{ thread, time::Duration, sync::{ Arc, Mutex } };
 
-use mandwm_api::core::{ MandwmCore, AppendTo::* };
+use crate::core::{ MandwmCore, AppendTo::* };
 use mandwm_api::log::*;
 
 fn main() {

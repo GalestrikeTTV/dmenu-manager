@@ -1,16 +1,15 @@
-use crate::log::*;
-/// The module `core` is used to initialize a session mandwm,
-/// if it doesn't already exist
 use crate::DBUS_NAME;
 
 use MandwmErrorLevel::*;
 
-use dbus::{blocking::LocalConnection, tree::Factory};
+use dbus::{blocking::LocalConnection, blocking::Connection, tree::Factory};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use std::path::{ Path, PathBuf };
+
+use mandwm_api::log::*;
 
 #[derive(Debug)]
 pub struct MandwmError {
@@ -139,7 +138,7 @@ impl MandwmCore {
 
         // TODO Cache default scripts (create a command and clone them into a vec?)
 
-        let res = read_dir("./").unwrap()
+        let res = read_dir("./scripts/default").unwrap()
             .map(|res| res.map(|e| e.path()))
             .collect::<Result<Vec<_>, std::io::Error>>().unwrap();
 

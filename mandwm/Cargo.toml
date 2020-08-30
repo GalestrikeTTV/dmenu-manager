@@ -8,4 +8,5 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mandwm-api = { path = "../mandwm-api", features = ["core", "bus"] }
+mandwm-api = { path = "../mandwm-api" }
+dbus = { version = "0.8.4" }

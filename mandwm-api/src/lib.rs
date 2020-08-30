@@ -1,13 +1,10 @@
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "core")]
-pub mod core;
-
 #[cfg(feature = "bus")]
 extern crate dbus;
 
-const DBUS_NAME: &'static str = "com.gale.mandwm";
+pub const DBUS_NAME: &'static str = "org.gale.mandwm";
 
 pub mod log {
     use crate::DBUS_NAME;
