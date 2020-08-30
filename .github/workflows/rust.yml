@@ -17,9 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Setup DBus
-      run: mkdir -p /var/run/dbus
-    - name: Start DBus
-      run: dbus-daemon --config-file=/usr/share/dbus-1/system.conf --print-address
+      run: sudo apt install dbus
     - name: Build
       run: cargo build --verbose
     - name: Run tests
