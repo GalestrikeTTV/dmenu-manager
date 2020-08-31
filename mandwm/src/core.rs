@@ -11,6 +11,39 @@ use std::path::{ Path, PathBuf };
 
 use mandwm_api::log::*;
 
+// Send u8 instead of nothing
+pub fn set_root_name<T: Into<String>>(string: T) -> Result<u8, MandwmError> {
+    use std::ffi::CString;
+    use x11::*;
+    
+    let name: CString = match CString::new(string.into()) {
+        Ok(name) => { name },
+        Err(e) => {
+            return Err(MandwmError::critical(format!("Invalid name for set_root_name: {}", e)));
+        }
+    };
+
+    // TODO check the length of the string and make sure that it isn't too big
+    
+    unsafe {
+        let mut display = xlib::XOpenDisplay(std::ptr::null());
+
+        if display.is_null() {
+            panic!("XOpenDisplay failed");
+        }
+
+        // Create window.
+        let screen = xlib::XDefaultScreen(display);
+        let root = xlib::XRootWindow(display, screen);
+
+        let res = x11::xlib::XStoreName(display, root, name.as_ptr());
+
+        xlib::XCloseDisplay(display);
+    }
+
+    Ok(0)
+}
+
 #[derive(Debug)]
 pub struct MandwmError {
     msg: String,
@@ -138,7 +171,7 @@ impl MandwmCore {
 
         // TODO Cache default scripts (create a command and clone them into a vec?)
 
-        let res = read_dir("./scripts/default").unwrap()
+        let res = read_dir("./").unwrap()
             .map(|res| res.map(|e| e.path()))
             .collect::<Result<Vec<_>, std::io::Error>>().unwrap();
 
@@ -201,7 +234,7 @@ impl MandwmCore {
                 // Check for dbus messages
                 //  <=== TODO
 
-                let mut command = Command::new("xsetroot");
+                /* let mut command = Command::new("xsetroot");
                 command.arg("-name");
 
                 let dwm_bar_string = core.lock().unwrap().dwm_bar_string.clone();
@@ -223,6 +256,15 @@ impl MandwmCore {
                 if output.stderr.len() > 0 {
                     log_critical(String::from_utf8(output.stderr.to_vec()).unwrap());
                 }
+
+                */
+
+                let mut final_str: String = String::new();
+                for string in core.lock().unwrap().dwm_bar_string.iter() {
+                    final_str.push_str(string.as_str());
+                }
+
+                set_root_name(final_str).unwrap();
 
                 thread::sleep(Duration::from_secs(1));
             }
@@ -248,3 +290,4 @@ impl Default for MandwmCore {
         }
     }
 }
+
