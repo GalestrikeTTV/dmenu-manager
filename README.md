@@ -10,6 +10,7 @@ None currently
 * Set the dwm title bar, append an item, and cycle through alternate title bar names.
 * Allow applications to send notifications/warnings through the title bar.
 * Provide a Rust API to be able to send messages easily in Rust apps.
+* Add features for patches like topbar.
 
 ## Dependencies
 dbus, rustc and cargo
