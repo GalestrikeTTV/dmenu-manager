@@ -2,47 +2,17 @@ use crate::DBUS_NAME;
 
 use MandwmErrorLevel::*;
 
-use dbus::{blocking::LocalConnection, blocking::Connection, tree::Factory};
+use dbus::{blocking::Connection, blocking::LocalConnection, tree::Factory};
+use std::ffi::CString;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use std::path::{ Path, PathBuf };
+use x11::xlib::*;
 
+use crate::xfuncs::*;
 use mandwm_api::log::*;
-
-// Send u8 instead of nothing
-pub fn set_root_name<T: Into<String>>(string: T) -> Result<u8, MandwmError> {
-    use std::ffi::CString;
-    use x11::*;
-    
-    let name: CString = match CString::new(string.into()) {
-        Ok(name) => { name },
-        Err(e) => {
-            return Err(MandwmError::critical(format!("Invalid name for set_root_name: {}", e)));
-        }
-    };
-
-    // TODO check the length of the string and make sure that it isn't too big
-    
-    unsafe {
-        let mut display = xlib::XOpenDisplay(std::ptr::null());
-
-        if display.is_null() {
-            panic!("XOpenDisplay failed");
-        }
-
-        // Create window.
-        let screen = xlib::XDefaultScreen(display);
-        let root = xlib::XRootWindow(display, screen);
-
-        let res = x11::xlib::XStoreName(display, root, name.as_ptr());
-
-        xlib::XCloseDisplay(display);
-    }
-
-    Ok(0)
-}
 
 #[derive(Debug)]
 pub struct MandwmError {
@@ -88,6 +58,7 @@ pub enum AppendTo {
     SHORTEST,
 }
 
+#[derive(Debug)]
 pub struct MandwmCore {
     pub dwm_bar_string: Vec<String>,
     default_scripts: Vec<Command>,
@@ -108,47 +79,54 @@ impl MandwmCore {
 
     /// Called once the MandwmCore object is initialized.
     pub fn connect(mut self) -> Result<Self, MandwmError> {
-        let conn = match LocalConnection::new_session() {
-            Ok(c) => c,
-            Err(e) => {
-                return Err(MandwmError::critical(format!(
-                    "Could not connect to dbus. Error: {}",
-                    e
-                )));
-            }
-        };
+        // We don't connect to the X11 display here because it messes up since we're working
+        // across threads.
+        
 
-        match conn.request_name(DBUS_NAME, false, true, false) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(MandwmError::critical(format!(
-                    "Could not request name \"{}\" from dbus. ERROR: {}",
-                    DBUS_NAME, e
-                )));
+        // Connect to DBUS
+        {
+            let conn = match LocalConnection::new_session() {
+                Ok(c) => c,
+                Err(e) => {
+                    return Err(MandwmError::critical(format!(
+                        "Could not connect to dbus. Error: {}",
+                        e
+                    )));
+                }
+            };
+
+            match conn.request_name(DBUS_NAME, false, true, false) {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err(MandwmError::critical(format!(
+                        "Could not request name \"{}\" from dbus. ERROR: {}",
+                        DBUS_NAME, e
+                    )));
+                }
             }
+
+            let factory = Factory::new_fn::<()>();
+
+            let proxy = conn.with_proxy("org.freedesktop.DBus", "/", Duration::from_millis(5000));
+
+            let (names,): (Vec<String>,) = proxy
+                .method_call("org.freedesktop.DBus", "ListNames", ())
+                .unwrap();
+            for name in names {
+                println!("{:?}", name);
+            }
+            match conn.release_name(DBUS_NAME) {
+                Ok(_) => {
+                    self.is_running = true;
+                }
+                Err(e) => {
+                    return Err(MandwmError::warn(format!(
+                        "Could not release name of {}. ERROR: {}",
+                        DBUS_NAME, e,
+                    )));
+                }
+            };
         }
-
-        let factory = Factory::new_fn::<()>();
-
-        let proxy = conn.with_proxy("org.freedesktop.DBus", "/", Duration::from_millis(5000));
-
-        let (names,): (Vec<String>,) = proxy
-            .method_call("org.freedesktop.DBus", "ListNames", ())
-            .unwrap();
-        for name in names {
-            println!("{:?}", name);
-        }
-        match conn.release_name(DBUS_NAME) {
-            Ok(_) => {
-                self.is_running = true;
-            }
-            Err(e) => {
-                return Err(MandwmError::warn(format!(
-                    "Could not release name of {}. ERROR: {}",
-                    DBUS_NAME, e,
-                )));
-            }
-        };
 
         Ok(self)
     }
@@ -171,9 +149,11 @@ impl MandwmCore {
 
         // TODO Cache default scripts (create a command and clone them into a vec?)
 
-        let res = read_dir("./").unwrap()
+        let res = read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/default/"))
+            .unwrap()
             .map(|res| res.map(|e| e.path()))
-            .collect::<Result<Vec<_>, std::io::Error>>().unwrap();
+            .collect::<Result<Vec<_>, std::io::Error>>()
+            .unwrap();
 
         for path in res.iter() {
             log_debug(path);
@@ -190,7 +170,6 @@ impl MandwmCore {
         }
         log_debug("Primary string set.");
     }
-
 
     pub fn append<T: Into<String>>(&mut self, place: AppendTo, message: T) {
         use AppendTo::*;
@@ -224,55 +203,70 @@ impl MandwmCore {
         }
     }
 
-    pub fn run(core: Arc<Mutex<MandwmCore>>) {
-        core.lock().unwrap().set_running(true);
+    pub fn run(mut self) -> Arc<Mutex<Self>> {
+        self.set_running(true);
+
+        let mutex = Arc::new(Mutex::new(self));
+
+        let thread_mutex = mutex.clone();
 
         thread::spawn(move || {
             log_debug("Starting mandwm.");
 
-            while core.lock().unwrap().should_close == false {
-                // Check for dbus messages
-                //  <=== TODO
+            // while core.lock().unwrap().should_close == false {
+            // Check for dbus messages
+            //  <=== TODO
 
-                /* let mut command = Command::new("xsetroot");
-                command.arg("-name");
+            /* let mut command = Command::new("xsetroot");
+            command.arg("-name");
 
-                let dwm_bar_string = core.lock().unwrap().dwm_bar_string.clone();
-                let delimiter = core.lock().unwrap().delimiter.clone();
-                let mut final_string = String::new();
+            let dwm_bar_string = core.lock().unwrap().dwm_bar_string.clone();
+            let delimiter = core.lock().unwrap().delimiter.clone();
+            let mut final_string = String::new();
 
-                for (i, bar_string) in dwm_bar_string.iter().enumerate() {
-                    if i >= dwm_bar_string.len() || i == 0 {
-                        final_string.push_str(bar_string.as_str());
-                    } else {
-                        final_string.push_str(format!(" {} {}", delimiter, bar_string).as_str());
-                    }
+            for (i, bar_string) in dwm_bar_string.iter().enumerate() {
+                if i >= dwm_bar_string.len() || i == 0 {
+                    final_string.push_str(bar_string.as_str());
+                } else {
+                    final_string.push_str(format!(" {} {}", delimiter, bar_string).as_str());
                 }
+            }
 
-                command.arg(format!(" {} ", final_string));
+            command.arg(format!(" {} ", final_string));
 
-                let output = command.output().unwrap();
+            let output = command.output().unwrap();
 
-                if output.stderr.len() > 0 {
-                    log_critical(String::from_utf8(output.stderr.to_vec()).unwrap());
-                }
+            if output.stderr.len() > 0 {
+                log_critical(String::from_utf8(output.stderr.to_vec()).unwrap());
+            }
 
-                */
+            */
 
-                let mut final_str: String = String::new();
-                for string in core.lock().unwrap().dwm_bar_string.iter() {
+            let mut final_str: String = String::new();
+            let mut counter: u8 = 0;
+            while thread_mutex.lock().unwrap().is_running {
+                final_str = String::new();
+                for string in thread_mutex.lock().unwrap().dwm_bar_string.iter() {
                     final_str.push_str(string.as_str());
                 }
 
-                set_root_name(final_str).unwrap();
+                let res =
+                    xdisplay_set_root(final_str).unwrap();
 
                 thread::sleep(Duration::from_secs(1));
+
+                counter += 1;
+                if counter > 5 {
+                    break;
+                }
             }
 
-            core.lock().unwrap().set_running(false);
+            thread_mutex.lock().unwrap().set_running(false);
 
             log_debug("Mandwm has finished running");
         });
+
+        return mutex;
     }
 }
 
@@ -290,4 +284,3 @@ impl Default for MandwmCore {
         }
     }
 }
-
