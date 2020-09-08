@@ -1,5 +1,8 @@
 # Ignore all builds
 /target
 
-# Ignore vim swapfile
+# Ignore my vim swapfile
 \\
+
+# Ignore vscode settings
+.vscode

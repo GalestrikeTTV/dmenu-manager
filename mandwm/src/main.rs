@@ -10,11 +10,19 @@ mod core;
 mod tests;
 mod xfuncs;
 
-use crate::core::{AppendTo::*, *};
+use crate::{
+    core::{AppendTo::*, *},
+    xfuncs::*,
+};
 pub use mandwm_api::log::*;
 use std::{thread, time::Duration};
 
 fn main() {
+
+    let config = mandwm_handle_args().unwrap();
+
+    log_debug(format!("Config: {}", config));
+
     let mut mandwm = MandwmCore::setup_mandwm()
         .unwrap()
         .set_delimiter(" | ")
@@ -29,11 +37,47 @@ fn main() {
 
     log_debug(format!("Mandwm {:?}", mandwm));
 
-    let mandwm_mutex = mandwm.run();
+    mandwm_run(&mut mandwm, &config);
+}
 
-    // TODO check for dbus messages here
-    while mandwm_mutex.lock().unwrap().is_running() {
-        log_info("Mandwm is running.");
-        thread::sleep(Duration::new(1, 0));
+fn mandwm_run(mandwm: &mut MandwmCore, config: &MandwmConfig) {
+    mandwm.is_running = true;
+
+    log_debug("Starting mandwm.");
+
+    let mut final_str: String = String::new();
+    let mut counter: u8 = 0;
+    while mandwm.is_running {
+        final_str = String::new();
+        for string in mandwm.dwm_bar_string.iter() {
+            final_str.push_str(string.as_str());
+        }
+
+        xdisplay_set_root(final_str, config.display_var).unwrap();
+
+        thread::sleep(Duration::from_secs(1));
+
+        counter += 1;
+        if counter > 5 {
+            break;
+        }
     }
+
+    mandwm.is_running = false;
+}
+
+fn mandwm_handle_args() -> Result<MandwmConfig, MandwmError> {
+    let mut config = MandwmConfig {
+        display_var: "",
+    };
+
+    let display = env!("DISPLAY");
+
+    if display.is_empty() {
+        return Err(MandwmError::critical(String::from("DISPLAY variable not set")));    
+    } else {
+        config.display_var = display;
+    }
+
+    Ok(config)
 }

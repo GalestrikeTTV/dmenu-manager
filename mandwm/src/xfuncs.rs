@@ -1,16 +1,15 @@
 use crate::core::*;
 use mandwm_api::log::*;
 use x11::xlib::*;
-use std::ffi::CString;
+use std::ffi::{ CString, CStr };
 
 pub type XDisplay = *mut Display;
 pub type XScreen = i32;
 pub type XRoot = u64;
-/// A wrapper for the xlib display types because they aren't thread safe.
+/// A wrapper for the xlib display types
 #[derive(Debug)]
 pub struct MandwmDisplay(XDisplay, XScreen, XRoot);
 
-unsafe impl Send for MandwmDisplay {}
 impl MandwmDisplay {
     pub fn get_display(&self) -> XDisplay {
         self.0
@@ -27,14 +26,22 @@ impl MandwmDisplay {
 
 impl Default for MandwmDisplay {
     fn default() -> Self {
-        use std::ptr::null;
-        MandwmDisplay(null::<Display> as XDisplay, -1, 0)
+        MandwmDisplay(std::ptr::null_mut::<Display>() as XDisplay, -1, 0)
     }
 }
 
-pub fn xdisplay_connect() -> Option<MandwmDisplay> {
+pub fn xdisplay_connect(display_var: &'static str) -> Option<MandwmDisplay> {
     let (display, screen, root) = unsafe {
-        let display = XOpenDisplay(std::ptr::null());
+        // XOpenDisplay takes in a *const char (so I may need to use env!("DISPLAY"))
+        let display_var_ptr: *const i8 = if display_var.is_empty() {
+            std::ptr::null()
+        } else {
+            CString::new(display_var).unwrap().as_ptr() as *const i8
+        };
+
+        log_debug(format!("Display var: {:?}", *display_var_ptr));
+
+        let display = XOpenDisplay(":0\0".as_ptr() as _);
 
         if display.is_null() {
             return None;
@@ -43,7 +50,7 @@ pub fn xdisplay_connect() -> Option<MandwmDisplay> {
         let screen = XDefaultScreen(display);
         let root = XRootWindow(display, screen);
 
-        log_debug(format!("screen: {}, root: {}", screen, root));
+        log_debug(format!("display: {:?}, screen: {}, root: {}", display, screen, root));
 
         (display, screen, root)
     };
@@ -52,13 +59,10 @@ pub fn xdisplay_connect() -> Option<MandwmDisplay> {
 }
 
 /// Replacement for xsetroot which is about 1.5x faster in Rust since we aren't spawning a shell
-pub fn xdisplay_set_root(name: String) -> Result<(), MandwmError> {
+pub fn xdisplay_set_root(name: String, display_var: &'static str) -> Result<(), MandwmError> {
+    let display = xdisplay_connect(display_var).unwrap();
+
     let null_term_name = CString::new(name.as_str()).unwrap();
-
-    // TODO figure out why we have to connect to X11 every time that we run this function and not
-    // just store the display in a mutex (maybe because we're running across threads?) 
-    let display = xdisplay_connect().unwrap();
-
     unsafe {
         let res = XStoreName(
             display.get_display(),

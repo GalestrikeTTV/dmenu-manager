@@ -61,12 +61,12 @@ pub enum AppendTo {
 #[derive(Debug)]
 pub struct MandwmCore {
     pub dwm_bar_string: Vec<String>,
-    default_scripts: Vec<Command>,
-    scripts_path: PathBuf,
-    delimiter: String,
-    is_running: bool,
-    should_close: bool,
-    max_length: usize,
+    pub default_scripts: Vec<Command>,
+    pub scripts_path: PathBuf,
+    pub delimiter: String,
+    pub is_running: bool,
+    pub should_close: bool,
+    pub max_length: usize,
 }
 
 impl MandwmCore {
@@ -81,7 +81,6 @@ impl MandwmCore {
     pub fn connect(mut self) -> Result<Self, MandwmError> {
         // We don't connect to the X11 display here because it messes up since we're working
         // across threads.
-        
 
         // Connect to DBUS
         {
@@ -129,14 +128,6 @@ impl MandwmCore {
         }
 
         Ok(self)
-    }
-
-    pub fn is_running(&self) -> bool {
-        self.is_running
-    }
-
-    fn set_running(&mut self, run: bool) {
-        self.is_running = run;
     }
 
     pub fn set_delimiter<T: Into<String>>(mut self, delimiter: T) -> Self {
@@ -203,8 +194,9 @@ impl MandwmCore {
         }
     }
 
+    /*
     pub fn run(mut self) -> Arc<Mutex<Self>> {
-        self.set_running(true);
+        self.is_running = true;
 
         let mutex = Arc::new(Mutex::new(self));
 
@@ -212,35 +204,6 @@ impl MandwmCore {
 
         thread::spawn(move || {
             log_debug("Starting mandwm.");
-
-            // while core.lock().unwrap().should_close == false {
-            // Check for dbus messages
-            //  <=== TODO
-
-            /* let mut command = Command::new("xsetroot");
-            command.arg("-name");
-
-            let dwm_bar_string = core.lock().unwrap().dwm_bar_string.clone();
-            let delimiter = core.lock().unwrap().delimiter.clone();
-            let mut final_string = String::new();
-
-            for (i, bar_string) in dwm_bar_string.iter().enumerate() {
-                if i >= dwm_bar_string.len() || i == 0 {
-                    final_string.push_str(bar_string.as_str());
-                } else {
-                    final_string.push_str(format!(" {} {}", delimiter, bar_string).as_str());
-                }
-            }
-
-            command.arg(format!(" {} ", final_string));
-
-            let output = command.output().unwrap();
-
-            if output.stderr.len() > 0 {
-                log_critical(String::from_utf8(output.stderr.to_vec()).unwrap());
-            }
-
-            */
 
             let mut final_str: String = String::new();
             let mut counter: u8 = 0;
@@ -268,6 +231,7 @@ impl MandwmCore {
 
         return mutex;
     }
+    */
 }
 
 impl Default for MandwmCore {
@@ -282,5 +246,15 @@ impl Default for MandwmCore {
             // TODO find a way to figure this out from dwm
             max_length: 50,
         }
+    }
+}
+
+pub struct MandwmConfig {
+    pub display_var: &'static str,
+}
+
+impl std::fmt::Display for MandwmConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DISPLAY: {}", self.display_var)
     }
 }
