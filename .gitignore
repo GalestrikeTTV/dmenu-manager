@@ -1,5 +1,6 @@
-# Ignore all builds
-/target
+# Ignore all builds and package lock
+/target/
+Cargo.lock
 
 # Ignore my vim swapfile
 \\
