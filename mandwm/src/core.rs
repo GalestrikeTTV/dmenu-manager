@@ -112,7 +112,7 @@ impl MandwmCore {
                 .method_call("org.freedesktop.DBus", "ListNames", ())
                 .unwrap();
             for name in names {
-                println!("{:?}", name);
+                log_info(name);
             }
             match conn.release_name(DBUS_NAME) {
                 Ok(_) => {
