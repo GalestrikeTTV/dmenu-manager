@@ -37,15 +37,19 @@ fn main() {
 
     log_debug(format!("Mandwm {:?}", mandwm));
 
-    mandwm_run(&mut mandwm, &config);
+    let display = xdisplay_connect(config.display_var).unwrap();
+
+    mandwm_run(&mut mandwm, &config, &display);
+
+    xdisplay_disconnect(&display);
 }
 
-fn mandwm_run(mandwm: &mut MandwmCore, config: &MandwmConfig) {
+fn mandwm_run(mandwm: &mut MandwmCore, config: &MandwmConfig, display: &MandwmDisplay) {
     mandwm.is_running = true;
 
     log_debug("Starting mandwm.");
 
-    let mut final_str: String = String::new();
+    let mut final_str: String;
     let mut counter: u8 = 0;
     while mandwm.is_running {
         final_str = String::new();
@@ -53,7 +57,7 @@ fn mandwm_run(mandwm: &mut MandwmCore, config: &MandwmConfig) {
             final_str.push_str(string.as_str());
         }
 
-        xdisplay_set_root(final_str, config.display_var).unwrap();
+        xdisplay_fast_set_root(final_str, &display).unwrap();
 
         thread::sleep(Duration::from_secs(1));
 
@@ -77,6 +81,7 @@ fn mandwm_handle_args() -> Result<MandwmConfig, MandwmError> {
         return Err(MandwmError::critical(String::from("DISPLAY variable not set")));    
     } else {
         config.display_var = display;
+        log_debug(display);
     }
 
     Ok(config)

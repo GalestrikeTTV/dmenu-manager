@@ -1,4 +1,4 @@
-const ITER_AMT: u32 = 1_000;
+const ITER_AMT: u32 = 1_000_000;
 
 #[test]
 fn speed_of_xsetroot_output() {
@@ -22,8 +22,8 @@ fn speed_of_custom_set_root_optimized() {
     use std::{ time::Instant, ffi::CString};
     use x11::xlib;
     
-    let (mut display, screen, root) = unsafe {
-        let mut display = xlib::XOpenDisplay(std::ptr::null());
+    let (display, root) = unsafe {
+        let display = xlib::XOpenDisplay(std::ptr::null());
         if display.is_null() {
             panic!("XOpenDisplay failed");
         }
@@ -32,7 +32,7 @@ fn speed_of_custom_set_root_optimized() {
         let screen = xlib::XDefaultScreen(display);
         let root = xlib::XRootWindow(display, screen);
         
-        (display, screen, root)
+        (display, root)
     };
 
     let name = CString::new("Optimized SetRoot.").unwrap();
@@ -41,7 +41,7 @@ fn speed_of_custom_set_root_optimized() {
 
     for _ in 0..ITER_AMT {      
         unsafe { 
-            let res = x11::xlib::XStoreName(display, root, name.as_ptr());
+            xlib::XStoreName(display, root, name.as_ptr());
         }
     }
 
