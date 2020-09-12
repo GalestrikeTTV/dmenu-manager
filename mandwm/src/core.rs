@@ -79,53 +79,39 @@ impl MandwmCore {
 
     /// Called once the MandwmCore object is initialized.
     pub fn connect(mut self) -> Result<Self, MandwmError> {
-        // We don't connect to the X11 display here because it messes up since we're working
-        // across threads.
-
         // Connect to DBUS
-        {
-            let conn = match LocalConnection::new_session() {
-                Ok(c) => c,
-                Err(e) => {
-                    return Err(MandwmError::critical(format!(
-                        "Could not connect to dbus. Error: {}",
-                        e
-                    )));
-                }
-            };
+        let conn = LocalConnection::new_session().unwrap();
+        conn.request_name(DBUS_NAME, false, true, false).unwrap();
 
-            match conn.request_name(DBUS_NAME, false, true, false) {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(MandwmError::critical(format!(
-                        "Could not request name \"{}\" from dbus. ERROR: {}",
-                        DBUS_NAME, e
-                    )));
-                }
-            }
+        let factory = Factory::new_fn::<()>();
 
-            let factory = Factory::new_fn::<()>();
+        // TODO get rid of this once you know what you are doing
+        let signal = Arc::new(factory.signal("HelloHappened", ()).sarg::<&str, _>("sender"));
+        let signal2 = signal.clone();
 
-            let proxy = conn.with_proxy("org.freedesktop.DBus", "/", Duration::from_millis(5000));
+        let tree = factory.tree(()).add(factory.object_path("/hello", ()).introspectable().add(
+            factory.interface(DBUS_NAME, ()).add_m(
+                factory.method("Hello", (), move |m| {
+                        // m is of type MethodInfo
+                        
+                        let name: &str = m.msg.read1().unwrap();
+                        let respose = format!("Mandwm read: {}", name);
+                        let mret = m.msg.method_return().append1(respose);
 
-            let (names,): (Vec<String>,) = proxy
-                .method_call("org.freedesktop.DBus", "ListNames", ())
-                .unwrap();
-            for name in names {
-                log_info(name);
-            }
-            match conn.release_name(DBUS_NAME) {
-                Ok(_) => {
-                    self.is_running = true;
-                }
-                Err(e) => {
-                    return Err(MandwmError::warn(format!(
-                        "Could not release name of {}. ERROR: {}",
-                        DBUS_NAME, e,
-                    )));
-                }
-            };
-        }
+                        let sig = signal
+                            .msg(m.path.get_name(), m.iface.get_name())
+                            .append1(&*name);
+
+                        Ok(vec![mret, sig])
+                })
+                .outarg::<&str,_>("reply")
+                .inarg::<&str,_>("name")
+            ).add_s(signal2)
+        )).add(factory.object_path("/", ()).introspectable());
+
+        tree.start_receive(&conn);
+
+        loop {  conn.process(Duration::from_secs(1)).unwrap(); }
 
         Ok(self)
     }

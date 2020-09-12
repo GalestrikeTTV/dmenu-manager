@@ -37,34 +37,24 @@ fn main() {
 
     log_debug(format!("Mandwm {:?}", mandwm));
 
-    let display = xdisplay_connect(config.display_var).unwrap();
+    mandwm_run(&mut mandwm, &config);
 
-    mandwm_run(&mut mandwm, &config, &display);
-
-    xdisplay_disconnect(&display);
 }
 
-fn mandwm_run(mandwm: &mut MandwmCore, config: &MandwmConfig, display: &MandwmDisplay) {
+fn mandwm_run(mandwm: &mut MandwmCore, config: &MandwmConfig) {
     mandwm.is_running = true;
 
     log_debug("Starting mandwm.");
 
-    let mut final_str: String;
-    let mut counter: u8 = 0;
     while mandwm.is_running {
-        final_str = String::new();
-        for string in mandwm.dwm_bar_string.iter() {
-            final_str.push_str(string.as_str());
-        }
-
-        xdisplay_fast_set_root(final_str, &display).unwrap();
-
-        thread::sleep(Duration::from_secs(1));
-
-        counter += 1;
-        if counter > 5 {
-            break;
-        }
+        // Spin off a thread that checks for dbus messages
+        // (Maybe not even spin off a thread? Dunno if it blocks
+        
+        // Check for the timer to see if we should output the bar
+        
+        // Execute bar scripts
+        
+        // Set the root
     }
 
     mandwm.is_running = false;

@@ -38,7 +38,7 @@ pub fn xdisplay_connect(display_var: &'static str) -> Option<MandwmDisplay> {
             CString::new(display_var).unwrap().as_ptr()
         };
 
-        let display = XOpenDisplay(display_var_ptr as *mut c_char);
+        let display = XOpenDisplay(":0\0".as_ptr() as *mut c_char);
 
         if display == null_mut() {
             return None;
@@ -55,14 +55,17 @@ pub fn xdisplay_connect(display_var: &'static str) -> Option<MandwmDisplay> {
     Some(MandwmDisplay(display, screen, root))
 }
 
-
+/// I'm trying to optimize this so you don't have to open and close a display every time that you
+/// set the root but it doesn't seem to be working on my system for whatever reason.
 pub fn xdisplay_fast_set_root(name: String, display: &MandwmDisplay) -> Result<(), MandwmError> {
-    let null_term_name = CString::new(name.as_str()).unwrap();
+    // Use this as the name later on 
+    let _null_term_name = CString::new(name).unwrap();
     unsafe {
         let res = XStoreName(
             display.get_display(),
             display.get_root(),
-            null_term_name.as_ptr() as *const i8,
+            // null_term_name.as_ptr() as *const i8,
+            null() as _,
         );
         log_debug(format!("Result of set_root: {}", res));
     }
@@ -74,7 +77,7 @@ pub fn xdisplay_fast_set_root(name: String, display: &MandwmDisplay) -> Result<(
 pub fn xdisplay_set_root(name: String, display_var: &'static str) -> Result<(), MandwmError> {
     let display = xdisplay_connect(display_var).unwrap();
 
-    let null_term_name = CString::new(name.as_str()).unwrap();
+    let null_term_name = CString::new(name).unwrap();
     unsafe {
         let res = XStoreName(
             display.get_display(),

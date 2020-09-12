@@ -1,0 +1,14 @@
+# This will be the config file for mandwm that will sit in these paths
+# and search for them in order:
+
+# $HOME/.config/mandwm/config.toml
+# /etc/mandwm/config.toml
+
+[dbus-config]
+dbus-name = "org.gale.mandwm"
+
+[shell-scripts]
+# Run every script in the scripts folder
+allow-any = false
+# Specify which scripts to show in the bar
+runtime = ["sound", "date", "time"]
