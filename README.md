@@ -16,7 +16,7 @@ None currently
 
 ### Potential Features (Unlikely to be implemented)
 * Wrap over dwm so that scripts can be cleaned up more easily
-* Compile dwm into mandwm (might be faster?)
+* Compile dwm into mandwm (might be faster?) and add patches as cargo features
 
 ## Dependencies
 dbus, rustc and cargo
