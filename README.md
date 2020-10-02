@@ -19,5 +19,5 @@ None currently
 * Compile dwm into mandwm (might be faster?) and add patches as cargo features
 
 ## Dependencies
-dbus, rustc and cargo
+dbus, rustc and cargo.
 Ubuntu servers need the package `libdbus-1-dev` to compile and test the program.
