@@ -2,7 +2,7 @@
 /target/
 Cargo.lock
 
-# Ignore my vim swapfile
+# Ignore my vim swapfile (?)
 \\
 
 # Ignore vscode settings

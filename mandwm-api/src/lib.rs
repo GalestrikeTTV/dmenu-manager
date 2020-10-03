@@ -1,5 +1,10 @@
+extern crate macros;
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "macro")]
+pub use macros::*;
 
 #[cfg(feature = "bus")]
 extern crate dbus;
@@ -8,6 +13,7 @@ pub const DBUS_NAME: &'static str = "org.gale.mandwm";
 
 /// These are currently implemented in a way that will not be done in the final version of the
 /// program. I definitely will replace them for macros sooner or later.
+// TODO replace these with macros
 pub mod log {
     use crate::DBUS_NAME;
     use std::fmt::{ Display, Debug };

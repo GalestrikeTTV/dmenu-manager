@@ -1,6 +1,6 @@
-extern crate dbus;
-extern crate mandwm_api;
-extern crate x11;
+// TODO remove this once the thing works in general
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 // Replace this with something easier to change (config file)
 pub use mandwm_api::DBUS_NAME;
@@ -15,10 +15,9 @@ use crate::{
     xfuncs::*,
 };
 pub use mandwm_api::log::*;
-use std::{thread, time::Duration};
+use std::{thread, time::Duration, path::Path, process::{Command, Stdio}};
 
 fn main() {
-
     let config = mandwm_handle_args().unwrap();
 
     log_debug(format!("Config: {}", config));
@@ -26,7 +25,7 @@ fn main() {
     let mut mandwm = MandwmCore::setup_mandwm()
         .unwrap()
         .set_delimiter(" | ")
-        .set_default_scripts(&["time", "date", "power"], std::path::PathBuf::from("./"))
+        .set_shell_scripts(&["time", "date", "power"], std::path::PathBuf::from("./"))
         .connect()
         .unwrap();
 
@@ -53,6 +52,10 @@ fn mandwm_run(mandwm: &mut MandwmCore, config: &MandwmConfig) {
         // Check for the timer to see if we should output the bar
         
         // Execute bar scripts
+        let sh_scripts = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "mandwm/scripts/shell/"));
+        for script in sh_scripts.iter() {
+            log_debug(script);
+        }
         
         // Set the root
     }

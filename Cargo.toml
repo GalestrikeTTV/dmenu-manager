@@ -3,4 +3,5 @@
 members = [
     "mandwm",
     "mandwm-api",
+    "mandwm-ffi"
 ]

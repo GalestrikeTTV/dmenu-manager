@@ -26,6 +26,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "macros"
+version = "0.1.0"
+
+[[package]]
 name = "mandwm"
 version = "0.1.0"
 dependencies = [
@@ -40,6 +44,14 @@ name = "mandwm-api"
 version = "0.1.0"
 dependencies = [
  "dbus",
+ "macros",
+]
+
+[[package]]
+name = "mandwm-ffi"
+version = "0.1.0"
+dependencies = [
+ "mandwm-api",
 ]
 
 [[package]]

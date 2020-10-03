@@ -1,3 +1,6 @@
+// TODO remove checks once the core functionality is set
+// I wrote this and I have no idea what this means. I think I wanted to not rely on this crate's
+// DBUS_NAME
 use crate::DBUS_NAME;
 
 use MandwmErrorLevel::*;
@@ -59,25 +62,26 @@ pub enum AppendTo {
 }
 
 #[derive(Debug)]
-pub struct MandwmCore {
-    pub dwm_bar_string: Vec<String>,
-    pub default_scripts: Vec<Command>,
-    pub scripts_path: PathBuf,
-    pub delimiter: String,
+pub struct MandwmCore<'a> {
+    /// A cached version of what's on the dwm bar
+    // Might need to wrap this for clarity
+    dwm_bar_string: Vec<String>,
+    shell_scripts: Vec<MandwmCommand<'a>>,
+    delimiter: String,
     pub is_running: bool,
-    pub should_close: bool,
-    pub max_length: usize,
+    should_close: bool,
+    max_length: usize,
 }
 
-impl MandwmCore {
-    pub fn setup_mandwm() -> Result<MandwmCore, Box<dyn std::error::Error>> {
-        // We'll do something with this later, just to make sure we're running as daemon or something.
+impl<'a> MandwmCore<'a> {
+    pub fn setup_mandwm() -> Result<MandwmCore<'a>, Box<dyn std::error::Error>> {
+        // TODO We'll do something with this later, just to make sure we're running as daemon or something.
         let _args: Vec<String> = std::env::args().collect();
 
         Ok(MandwmCore::default())
     }
 
-    /// Called once the MandwmCore object is initialized.
+    /// Sets up the DBUS/TCP connection.
     pub fn connect(mut self) -> Result<Self, MandwmError> {
         // Connect to DBUS
         let conn = LocalConnection::new_session().unwrap();
@@ -86,32 +90,41 @@ impl MandwmCore {
         let factory = Factory::new_fn::<()>();
 
         // TODO get rid of this once you know what you are doing
-        let signal = Arc::new(factory.signal("HelloHappened", ()).sarg::<&str, _>("sender"));
+        let signal = Arc::new(
+            factory
+                .signal("SomethingHappened", ())
+                .sarg::<&str, _>("sender"),
+        );
         let signal2 = signal.clone();
 
-        let tree = factory.tree(()).add(factory.object_path("/hello", ()).introspectable().add(
-            factory.interface(DBUS_NAME, ()).add_m(
-                factory.method("Hello", (), move |m| {
-                        // m is of type MethodInfo
-                        
-                        let name: &str = m.msg.read1().unwrap();
-                        let respose = format!("Mandwm read: {}", name);
-                        let mret = m.msg.method_return().append1(respose);
+        // Programmer notes
+        //
+        // GENERAL STRUCTURE
+        // * Create all methods and properties
+        // * Put methods into interfaces
+        // * Add interfaces into an object path in a tree
 
-                        let sig = signal
-                            .msg(m.path.get_name(), m.iface.get_name())
-                            .append1(&*name);
+        let method_rerun_scripts = factory.method("RerunScripts", (), move |m| {
+            // TODO send a command to rerun scripts
+            Ok(vec![m.msg.method_return()])
+        })
+        // .outarg for returning args
+        // .inarg for taking args
+        ;
 
-                        Ok(vec![mret, sig])
-                })
-                .outarg::<&str,_>("reply")
-                .inarg::<&str,_>("name")
-            ).add_s(signal2)
-        )).add(factory.object_path("/", ()).introspectable());
+        let mandwm_interface = factory.interface(DBUS_NAME, ()).add_m(method_rerun_scripts);
 
-        tree.start_receive(&conn);
+        let mandwm_tree = factory.tree(()).add(
+            factory
+                .object_path("org/gale/mandwm", ())
+                .introspectable()
+                .add(mandwm_interface),
+        );
 
-        loop {  conn.process(Duration::from_secs(1)).unwrap(); }
+        mandwm_tree.start_receive(&conn);
+
+        // TODO move this to the main loop
+        conn.process(Duration::from_secs(1)).unwrap();
 
         Ok(self)
     }
@@ -121,22 +134,32 @@ impl MandwmCore {
         self
     }
 
-    pub fn set_default_scripts(mut self, slice: &[&str], path: PathBuf) -> Self {
+    /// Takes all scripts in the scripts directory and creates Commands for them.
+    /// Functionality for this will be expanded in the future.
+    pub fn parse_shell_scripts(&self) {
         use std::fs::read_dir;
 
-        // TODO Cache default scripts (create a command and clone them into a vec?)
-
-        let res = read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/default/"))
+        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/shell/"));
+        let res = read_dir(path)
             .unwrap()
-            .map(|res| res.map(|e| e.path()))
-            .collect::<Result<Vec<_>, std::io::Error>>()
-            .unwrap();
+            .map(|res| res.map(|e| e.path()).unwrap())
+            .collect::<Vec<_>>();
 
-        for path in res.iter() {
-            log_debug(path);
+        let mut scripts = Vec::<MandwmCommand>::new();
+
+        for script_path in res.iter() {
+            // TODO better error handling
+            let name: &str = script_path
+                .to_str()
+                .expect("Failed to get script in script path.");
+            let mut script = Command::new("sh");
+            script.args(&["-c", name]);
+
+            let command = MandwmCommand { name, script, path };
+            scripts.push(command);
         }
 
-        self
+        self.shell_scripts = scripts;
     }
 
     pub fn set_primary_string<T: Into<String>>(&mut self, message: T) {
@@ -220,16 +243,15 @@ impl MandwmCore {
     */
 }
 
-impl Default for MandwmCore {
+impl<'a> Default for MandwmCore<'a> {
     fn default() -> Self {
         MandwmCore {
             dwm_bar_string: Vec::new(),
             delimiter: " | ".to_string(),
-            default_scripts: vec![],
-            scripts_path: PathBuf::new(),
+            shell_scripts: vec![],
             is_running: false,
             should_close: false,
-            // TODO find a way to figure this out from dwm
+            // TODO find a way to figure this out from dwm or X
             max_length: 50,
         }
     }
@@ -242,5 +264,43 @@ pub struct MandwmConfig {
 impl std::fmt::Display for MandwmConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "DISPLAY: {}", self.display_var)
+    }
+}
+
+#[derive(Debug)]
+struct MandwmCommand<'a> {
+    name: &'a str,
+    script: Command,
+    path: &'a Path, // This is a PathBuf because Path isn't sized
+}
+
+impl<'a> MandwmCommand<'a> {
+    pub fn set_name(&mut self, name: &'a str) {
+        self.name = name;
+    }
+
+    // Will return the formatted output (from a cache too potentially)
+    // Returns stdout or stderr
+    pub fn output(&mut self) -> Result<String, MandwmError> {
+        let finished = self.script.output();
+        match finished {
+            Ok(v) => {
+                let out = String::from_utf8(v.stdout).unwrap();
+                let err = String::from_utf8(v.stderr).unwrap();
+                log_debug(format!("STDOUT: {}\nSTDERR: {}", out, err));
+                if v.status.success() {
+                    Ok(out)
+                } else {
+                    Err(MandwmError::warn(format!(
+                        "Error executing command.\nName: {}\nSTDERR: {}",
+                        self.name, err
+                    )))
+                }
+            }
+            Err(e) => Err(MandwmError::warn(format!(
+                "Unable to execute command.\nName: {}\nExecution error: {}",
+                self.name, e
+            ))),
+        }
     }
 }

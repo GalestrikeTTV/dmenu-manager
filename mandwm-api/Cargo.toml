@@ -8,5 +8,15 @@ license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-dbus = { version = "0.8.4" }
+[features]
+macro = ["macros"]
+bus = ["dbus"]
+default = ["macro", "bus"]
+
+[dependencies.dbus]
+version = "0.8.4"
+optional = true
+
+[dependencies.macros]
+path = "./macros"
+optional = true
