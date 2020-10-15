@@ -17,6 +17,7 @@ use x11::xlib::*;
 use crate::xfuncs::*;
 use mandwm_api::log::*;
 
+// TODO move these to mandwm-api
 #[derive(Debug)]
 pub struct MandwmError {
     msg: String,
@@ -62,26 +63,56 @@ pub enum AppendTo {
 }
 
 #[derive(Debug)]
-pub struct MandwmCore<'a> {
-    /// A cached version of what's on the dwm bar
+pub struct MandwmCore<'core> {
+    /// A cached version of what's on the dwm bar.
     // Might need to wrap this for clarity
     dwm_bar_string: Vec<String>,
-    shell_scripts: Vec<MandwmCommand<'a>>,
+    /// Commands that run on their specified timers.
+    shell_scripts: Vec<MandwmCommand<'core>>,
+    /// The delimiter between the output of each shell script.
     delimiter: String,
     pub is_running: bool,
+    /// States whether or not the app needs to be cleaned up. Useful for checking whether or not a
+    /// dbus message has been sent to shut down the daemon.
     should_close: bool,
+    /// The maximum length of the string that mandwm will send to xsetroot.
     max_length: usize,
 }
 
-impl<'a> MandwmCore<'a> {
-    pub fn setup_mandwm() -> Result<MandwmCore<'a>, Box<dyn std::error::Error>> {
+impl<'core> MandwmCore<'core> {
+    pub fn setup_mandwm() -> Result<MandwmCore<'core>, Box<dyn std::error::Error>> {
         // TODO We'll do something with this later, just to make sure we're running as daemon or something.
         let _args: Vec<String> = std::env::args().collect();
 
-        Ok(MandwmCore::default())
+        let mut mandwm = MandwmCore::default().parse_shell_scripts();
+
+        mandwm.set_delimiter(" | ");
+
+        Ok(mandwm)
+    }
+
+    pub fn run(&mut self, config: &MandwmConfig) {
+        self.is_running = true;
+
+        log_info!("Starting mandwm.");
+
+        while self.is_running {
+            // Spin off a thread that checks for dbus messages
+            // (Maybe not even spin off a thread? Dunno if it blocks
+
+            // Check for the timer to see if we should output the bar
+            // Execute bar scripts
+
+            thread::sleep(Duration::from_secs(1));
+
+            // Set the root
+        }
+
+        self.is_running = false;
     }
 
     /// Sets up the DBUS/TCP connection.
+    #[allow(unused_mut)] // TODO remove this
     pub fn connect(mut self) -> Result<Self, MandwmError> {
         // Connect to DBUS
         let conn = LocalConnection::new_session().unwrap();
@@ -129,19 +160,16 @@ impl<'a> MandwmCore<'a> {
         Ok(self)
     }
 
-    pub fn set_delimiter<T: Into<String>>(mut self, delimiter: T) -> Self {
+    pub fn set_delimiter<T: Into<String>>(&mut self, delimiter: T) {
         self.delimiter = delimiter.into();
-        self
     }
 
     /// Takes all scripts in the scripts directory and creates Commands for them.
     /// Functionality for this will be expanded in the future.
-    pub fn parse_shell_scripts(&self) {
-        use std::fs::read_dir;
-
+    fn parse_shell_scripts(mut self) -> Self {
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/shell/"));
-        let res = read_dir(path)
-            .unwrap()
+        let res = std::fs::read_dir(path)
+            .expect("Could not read shell script directory")
             .map(|res| res.map(|e| e.path()).unwrap())
             .collect::<Vec<_>>();
 
@@ -149,26 +177,26 @@ impl<'a> MandwmCore<'a> {
 
         for script_path in res.iter() {
             // TODO better error handling
-            let name: &str = script_path
-                .to_str()
-                .expect("Failed to get script in script path.");
-            let mut script = Command::new("sh");
-            script.args(&["-c", name]);
+            let owned_script_path = script_path.to_owned();
+            let script = Command::new(owned_script_path.clone());
 
+            let name = owned_script_path.into_os_string();
             let command = MandwmCommand { name, script, path };
             scripts.push(command);
         }
 
         self.shell_scripts = scripts;
+        self
     }
 
+    // TODO return a Result
     pub fn set_primary_string<T: Into<String>>(&mut self, message: T) {
         if self.dwm_bar_string.len() >= 1 {
             self.dwm_bar_string[0] = message.into();
         } else {
             self.dwm_bar_string.push(message.into());
         }
-        log_debug("Primary string set.");
+        log_debug!("Primary string set.");
     }
 
     pub fn append<T: Into<String>>(&mut self, place: AppendTo, message: T) {
@@ -243,7 +271,7 @@ impl<'a> MandwmCore<'a> {
     */
 }
 
-impl<'a> Default for MandwmCore<'a> {
+impl<'core> Default for MandwmCore<'core> {
     fn default() -> Self {
         MandwmCore {
             dwm_bar_string: Vec::new(),
@@ -257,6 +285,7 @@ impl<'a> Default for MandwmCore<'a> {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct MandwmConfig {
     pub display_var: &'static str,
 }
@@ -268,15 +297,15 @@ impl std::fmt::Display for MandwmConfig {
 }
 
 #[derive(Debug)]
-struct MandwmCommand<'a> {
-    name: &'a str,
+struct MandwmCommand<'comm> {
+    name: std::ffi::OsString,
     script: Command,
-    path: &'a Path, // This is a PathBuf because Path isn't sized
+    path: &'comm Path,
 }
 
 impl<'a> MandwmCommand<'a> {
     pub fn set_name(&mut self, name: &'a str) {
-        self.name = name;
+        self.name = name.into();
     }
 
     // Will return the formatted output (from a cache too potentially)
@@ -287,18 +316,18 @@ impl<'a> MandwmCommand<'a> {
             Ok(v) => {
                 let out = String::from_utf8(v.stdout).unwrap();
                 let err = String::from_utf8(v.stderr).unwrap();
-                log_debug(format!("STDOUT: {}\nSTDERR: {}", out, err));
+                log_debug!(format!("STDOUT: {}\nSTDERR: {}", out, err));
                 if v.status.success() {
                     Ok(out)
                 } else {
                     Err(MandwmError::warn(format!(
-                        "Error executing command.\nName: {}\nSTDERR: {}",
+                        "Error executing command.\nName: {:?}\nSTDERR: {}",
                         self.name, err
                     )))
                 }
             }
             Err(e) => Err(MandwmError::warn(format!(
-                "Unable to execute command.\nName: {}\nExecution error: {}",
+                "Unable to execute command.\nName: {:?}\nExecution error: {}",
                 self.name, e
             ))),
         }

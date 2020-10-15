@@ -1,7 +1,11 @@
 use crate::core::*;
 use mandwm_api::log::*;
+use std::{
+    ffi::{CStr, CString},
+    os::raw::*,
+    ptr::{null, null_mut},
+};
 use x11::xlib::*;
-use std::{ ffi::{ CString, CStr }, ptr::{ null, null_mut }, os::raw::*};
 
 pub type XDisplay = *mut Display;
 pub type XScreen = i32;
@@ -47,7 +51,10 @@ pub fn xdisplay_connect(display_var: &'static str) -> Option<MandwmDisplay> {
         let screen = XDefaultScreen(display);
         let root = XRootWindow(display, screen);
 
-        log_debug(format!("display: {:?}, screen: {}, root: {}", display, screen, root));
+        log_debug!(format!(
+            "display: {:?}, screen: {}, root: {}",
+            display, screen, root
+        ));
 
         (display, screen, root)
     };
@@ -58,7 +65,7 @@ pub fn xdisplay_connect(display_var: &'static str) -> Option<MandwmDisplay> {
 /// I'm trying to optimize this so you don't have to open and close a display every time that you
 /// set the root but it doesn't seem to be working on my system for whatever reason.
 pub fn xdisplay_fast_set_root(name: String, display: &MandwmDisplay) -> Result<(), MandwmError> {
-    // Use this as the name later on 
+    // Use this as the name later on
     let _null_term_name = CString::new(name).unwrap();
     unsafe {
         let res = XStoreName(
@@ -67,7 +74,7 @@ pub fn xdisplay_fast_set_root(name: String, display: &MandwmDisplay) -> Result<(
             // null_term_name.as_ptr() as *const i8,
             null() as _,
         );
-        log_debug(format!("Result of set_root: {}", res));
+        log_debug!(format!("Result of set_root: {}", res));
     }
 
     Ok(())
@@ -84,7 +91,7 @@ pub fn xdisplay_set_root(name: String, display_var: &'static str) -> Result<(), 
             display.get_root(),
             null_term_name.as_ptr() as *const i8,
         );
-        log_debug(format!("Result of set_root: {}", res));
+        log_debug!(format!("Result of set_root: {}", res));
     }
 
     xdisplay_disconnect(&display);
@@ -95,6 +102,6 @@ pub fn xdisplay_set_root(name: String, display_var: &'static str) -> Result<(), 
 pub fn xdisplay_disconnect(xdisplay: &MandwmDisplay) {
     unsafe {
         let res = XCloseDisplay(xdisplay.get_display());
-        log_debug(format!("Result of disconnect_display: {}", res));
+        log_debug!(format!("Result of disconnect_display: {}", res));
     }
 }

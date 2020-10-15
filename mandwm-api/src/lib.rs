@@ -13,25 +13,52 @@ pub const DBUS_NAME: &'static str = "org.gale.mandwm";
 
 /// These are currently implemented in a way that will not be done in the final version of the
 /// program. I definitely will replace them for macros sooner or later.
-// TODO replace these with macros
 pub mod log {
     use crate::DBUS_NAME;
-    use std::fmt::{ Display, Debug };
 
-    pub fn log_info<T: Display>(message: T) {
-        println!("{} - Info: {}", DBUS_NAME, message);
+    #[macro_export]
+    macro_rules! log_debug {
+        () => {
+            println!("{}, line {}: ", file!(), line!())
+        };
+        ($fmt:expr) => {
+            println!("{}, line {}: {}", file!(), line!(), $fmt)
+        };
+        ($fmt:expr, $($args:tt)*) => {
+            println!("{}, line {}: {}", file!(), line!(), format_args!($fmt, $($args)*))
+        };
     }
 
-    pub fn log_debug<T: Debug>(message: T) {
-        println!("{} - Debug: {:#?}", DBUS_NAME, message);
+    #[macro_export]
+    macro_rules! log_info {
+        ($fmt:expr) => {
+            println!("{}", $fmt)
+        };
+        ($fmt:expr, $($args:tt)*) => {
+            println!("{}", format_args!($fmt, $($args)*))
+        };
     }
 
-    pub fn log_warn<T: Display>(message: T) {
-        println!("{} - WARN: {}", DBUS_NAME, message);
+    #[macro_export]
+    // maybe use escape sequences for color?
+    macro_rules! log_warn {
+        ($fmt:expr) => {
+            println!("warn: {}", $fmt)
+        };
+        ($fmt:expr, $($args:tt)*) => {
+            println!("warn: {}", format_args!($fmt, $($args)*))
+        };
     }
 
-    pub fn log_critical<T: Display>(message: T) {
-        println!("{} - CRITICAL: {}", DBUS_NAME, message);
+    #[macro_export]
+    // maybe use escape sequences for color?
+    macro_rules! log_critical {
+        ($fmt:expr) => {
+            println!("CRITICAL {}, line {}: {}", file!(), line!(), $fmt)
+        };
+        ($fmt:expr, $($args:tt)*) => {
+            println!("CRITICAL {}, line {}: {}", file!(), line!(), format_args!($fmt, $($args)*))
+        };
     }
 }
 
