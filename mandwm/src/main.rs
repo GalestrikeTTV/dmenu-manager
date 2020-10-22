@@ -9,6 +9,7 @@ extern crate mandwm_api;
 pub use mandwm_api::DBUS_NAME;
 
 mod core;
+mod dbus;
 #[cfg(test)]
 mod tests;
 mod xfuncs;

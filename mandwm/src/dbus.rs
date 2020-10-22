@@ -1,7 +1,7 @@
 /// Given after mandwm.run() is called. It should give off events based on what's happening on the
 /// dbus.
 pub struct MandwmRunner {
-    pub should_run: bool,
+    pub is_running: bool,
     // Some other dbus information we want to give
 }
 

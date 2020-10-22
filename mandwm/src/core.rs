@@ -14,7 +14,7 @@ use std::thread;
 use std::time::Duration;
 use x11::xlib::*;
 
-use crate::xfuncs::*;
+use crate::{dbus::*, xfuncs::*};
 use mandwm_api::log::*;
 
 // TODO move these to mandwm-api
@@ -84,14 +84,17 @@ impl<'core> MandwmCore<'core> {
         // TODO We'll do something with this later, just to make sure we're running as daemon or something.
         let _args: Vec<String> = std::env::args().collect();
 
-        let mut mandwm = MandwmCore::default().parse_shell_scripts();
-
-        mandwm.set_delimiter(" | ");
+        let mut mandwm = MandwmCore::default();
+        mandwm.parse_shell_scripts();
 
         Ok(mandwm)
     }
 
-    pub fn run(&mut self, config: &MandwmConfig) {
+    pub fn run(mut self, _config: &MandwmConfig) -> MandwmRunner {
+        MandwmRunner { is_running: true }
+    }
+
+    async fn internal_run(mut self) {
         self.is_running = true;
 
         log_info!("Starting mandwm.");
@@ -109,6 +112,7 @@ impl<'core> MandwmCore<'core> {
         }
 
         self.is_running = false;
+        log_info!("Mandwm has finished running");
     }
 
     /// Sets up the DBUS/TCP connection.
@@ -126,7 +130,7 @@ impl<'core> MandwmCore<'core> {
                 .signal("SomethingHappened", ())
                 .sarg::<&str, _>("sender"),
         );
-        let signal2 = signal.clone();
+        let _signal2 = signal.clone();
 
         // Programmer notes
         //
@@ -166,7 +170,7 @@ impl<'core> MandwmCore<'core> {
 
     /// Takes all scripts in the scripts directory and creates Commands for them.
     /// Functionality for this will be expanded in the future.
-    fn parse_shell_scripts(mut self) -> Self {
+    fn parse_shell_scripts(&mut self) {
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/shell/"));
         let res = std::fs::read_dir(path)
             .expect("Could not read shell script directory")
@@ -175,7 +179,7 @@ impl<'core> MandwmCore<'core> {
 
         let mut scripts = Vec::<MandwmCommand>::new();
 
-        for script_path in res.iter() {
+        for script_path in res {
             // TODO better error handling
             let owned_script_path = script_path.to_owned();
             let script = Command::new(owned_script_path.clone());
@@ -186,7 +190,6 @@ impl<'core> MandwmCore<'core> {
         }
 
         self.shell_scripts = scripts;
-        self
     }
 
     // TODO return a Result
@@ -230,45 +233,6 @@ impl<'core> MandwmCore<'core> {
             }
         }
     }
-
-    /*
-    pub fn run(mut self) -> Arc<Mutex<Self>> {
-        self.is_running = true;
-
-        let mutex = Arc::new(Mutex::new(self));
-
-        let thread_mutex = mutex.clone();
-
-        thread::spawn(move || {
-            log_debug("Starting mandwm.");
-
-            let mut final_str: String = String::new();
-            let mut counter: u8 = 0;
-            while thread_mutex.lock().unwrap().is_running {
-                final_str = String::new();
-                for string in thread_mutex.lock().unwrap().dwm_bar_string.iter() {
-                    final_str.push_str(string.as_str());
-                }
-
-                let res =
-                    xdisplay_set_root(final_str).unwrap();
-
-                thread::sleep(Duration::from_secs(1));
-
-                counter += 1;
-                if counter > 5 {
-                    break;
-                }
-            }
-
-            thread_mutex.lock().unwrap().set_running(false);
-
-            log_debug("Mandwm has finished running");
-        });
-
-        return mutex;
-    }
-    */
 }
 
 impl<'core> Default for MandwmCore<'core> {
@@ -303,8 +267,8 @@ struct MandwmCommand<'comm> {
     path: &'comm Path,
 }
 
-impl<'a> MandwmCommand<'a> {
-    pub fn set_name(&mut self, name: &'a str) {
+impl<'comm> MandwmCommand<'comm> {
+    pub fn set_name(&mut self, name: &'comm str) {
         self.name = name.into();
     }
 
