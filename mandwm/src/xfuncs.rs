@@ -1,5 +1,5 @@
 use crate::core::*;
-use mandwm_api::log::*;
+use mandwm_api::{error::*, log::*};
 use std::{
     ffi::{CStr, CString},
     os::raw::*,

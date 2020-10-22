@@ -3,10 +3,9 @@
 // DBUS_NAME
 use crate::DBUS_NAME;
 
-use MandwmErrorLevel::*;
-
 use dbus::{blocking::Connection, blocking::LocalConnection, tree::Factory};
 use std::ffi::CString;
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -15,51 +14,14 @@ use std::time::Duration;
 use x11::xlib::*;
 
 use crate::{dbus::*, xfuncs::*};
-use mandwm_api::log::*;
-
-// TODO move these to mandwm-api
-#[derive(Debug)]
-pub struct MandwmError {
-    msg: String,
-    level: MandwmErrorLevel,
-}
-
-impl MandwmError {
-    pub fn critical(message: String) -> Self {
-        MandwmError {
-            msg: message,
-            level: CRITICAL,
-        }
-    }
-
-    pub fn warn(message: String) -> Self {
-        MandwmError {
-            msg: message,
-            level: WARN,
-        }
-    }
-
-    pub fn debug(message: String) -> Self {
-        MandwmError {
-            msg: message,
-            level: DEBUG,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum MandwmErrorLevel {
-    CRITICAL,
-    WARN,
-    DEBUG,
-}
+use mandwm_api::{ log::*, error::*};
 
 #[derive(Debug)]
 pub enum AppendTo {
-    FIRST,
-    NEXT,
-    LAST,
-    SHORTEST,
+    First,
+    Next,
+    Last,
+    Shortest,
 }
 
 #[derive(Debug)]
@@ -90,12 +52,19 @@ impl<'core> MandwmCore<'core> {
         Ok(mandwm)
     }
 
-    pub fn run(mut self, _config: &MandwmConfig) -> MandwmRunner {
-        MandwmRunner { is_running: true }
+    // TODO I need to multithread this instead.
+    pub async fn run(mut self, _config: &MandwmConfig) -> MandwmRunner {
+        let mut is_running = false;
+        let internal_run = self.internal_run(&mut is_running);
+        let result= internal_run.await;
+        // MandwmRunner {internal: internal_run }
+        MandwmRunner {}
     }
 
-    async fn internal_run(mut self) {
+    async fn internal_run(mut self, is_running: &mut bool) -> std::result::Result<(), MandwmError> {
         self.is_running = true;
+
+        *is_running = true;
 
         log_info!("Starting mandwm.");
 
@@ -106,13 +75,24 @@ impl<'core> MandwmCore<'core> {
             // Check for the timer to see if we should output the bar
             // Execute bar scripts
 
+            // Error checking
+            if false {
+                return Err(MandwmError::critical(String::from("Mandwm has crashed!")));
+            }
+
+            log_debug!("Mandwm main event loop!");
+
             thread::sleep(Duration::from_secs(1));
 
             // Set the root
+            //
+
         }
 
         self.is_running = false;
         log_info!("Mandwm has finished running");
+
+        Ok(())
     }
 
     /// Sets up the DBUS/TCP connection.

@@ -4,6 +4,8 @@
 
 #[macro_use]
 extern crate mandwm_api;
+#[macro_use]
+extern crate tokio;
 
 // Replace this with something easier to change (config file)
 pub use mandwm_api::DBUS_NAME;
@@ -18,7 +20,7 @@ use crate::{
     core::{AppendTo::*, *},
     xfuncs::*,
 };
-pub use mandwm_api::log::*;
+pub use mandwm_api::{ log::*, error::*};
 use std::{
     path::Path,
     process::{Command, Stdio},
@@ -26,7 +28,8 @@ use std::{
     time::Duration,
 };
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let config = mandwm_handle_args().unwrap();
 
     log_debug!(format!("Config: {}", config));
@@ -34,7 +37,7 @@ fn main() {
     let mut mandwm = MandwmCore::setup_mandwm().unwrap();
     mandwm.set_primary_string("By default, mandwm only displays time and date.");
     // FIRST, NEXT, LAST, SHORTEST(?); different algorithms for where the string should be placed.
-    mandwm.append(FIRST, "This is appended to the first string.");
+    mandwm.append(First, "This is appended to the first string.");
 
     log_debug!("Mandwm {:?}", mandwm);
 

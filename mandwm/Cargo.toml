@@ -12,3 +12,4 @@ mandwm-api = { path = "../mandwm-api" }
 dbus = { version = "0.8.4" }
 x11 = { version = "2.18.2", features = ["xlib"] }
 toml = { version = "0.5.6" }
+tokio = { version = "0.3.1", features = ["full"] }

@@ -17,6 +17,7 @@ pub mod log {
     use crate::DBUS_NAME;
 
     #[macro_export]
+    #[cfg(debug_assertions)]
     macro_rules! log_debug {
         () => {
             println!("{}, line {}: ", file!(), line!())
@@ -27,6 +28,13 @@ pub mod log {
         ($fmt:expr, $($args:tt)*) => {
             println!("{}, line {}: {}", file!(), line!(), format_args!($fmt, $($args)*))
         };
+    }
+
+    #[macro_export]
+    #[cfg(not(debug_assertions))]
+    macro_rules! log_debug {
+        () => {};
+        ($($args:tt)*) => {};
     }
 
     #[macro_export]
@@ -59,6 +67,46 @@ pub mod log {
         ($fmt:expr, $($args:tt)*) => {
             println!("CRITICAL {}, line {}: {}", file!(), line!(), format_args!($fmt, $($args)*))
         };
+    }
+}
+
+pub mod error {
+    pub use MandwmErrorLevel::*;
+
+    #[derive(Debug)]
+    pub struct MandwmError {
+        msg: String,
+        level: MandwmErrorLevel,
+    }
+
+    impl MandwmError {
+        pub fn critical<T: Into<String>>(message: T) -> Self {
+            MandwmError {
+                msg: message.into(),
+                level: Critical,
+            }
+        }
+
+        pub fn warn<T: Into<String>>(message: T) -> Self {
+            MandwmError {
+                msg: message.into(),
+                level: Warn,
+            }
+        }
+
+        pub fn debug<T: Into<String>>(message: T) -> Self {
+            MandwmError {
+                msg: message.into(),
+                level: Debug,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum MandwmErrorLevel {
+        Critical,
+        Warn,
+        Debug,
     }
 }
 
