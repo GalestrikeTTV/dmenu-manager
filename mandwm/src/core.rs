@@ -26,6 +26,7 @@ pub enum AppendTo {
 
 #[derive(Debug)]
 pub struct MandwmCore<'core> {
+    config: MandwmConfig,
     /// A cached version of what's on the dwm bar.
     // Might need to wrap this for clarity
     dwm_bar_string: Vec<String>,
@@ -55,16 +56,23 @@ impl<'core> MandwmCore<'core> {
     // TODO I need to multithread this instead.
     pub async fn run(mut self, _config: &MandwmConfig) -> MandwmRunner {
         let mut is_running = false;
-        let internal_run = self.internal_run(&mut is_running);
-        let result= internal_run.await;
+
+        // Temporary cloning until the program is rewritten to use Arc<Mutex>
+        // instead of just the raw MandwmCore type.
+        // TODO reimplement everything in Arc<Mutex>
+        let cloned = self.clone();
+        let handle = tokio::spawn(async {
+            return cloned.internal_run();
+        });
+
+        let result = handle.await.unwrap();
+        
         // MandwmRunner {internal: internal_run }
         MandwmRunner {}
     }
 
-    async fn internal_run(mut self, is_running: &mut bool) -> std::result::Result<(), MandwmError> {
+    async fn internal_run(mut self) -> std::result::Result<(), MandwmError> {
         self.is_running = true;
-
-        *is_running = true;
 
         log_info!("Starting mandwm.");
 
@@ -82,11 +90,15 @@ impl<'core> MandwmCore<'core> {
 
             log_debug!("Mandwm main event loop!");
 
-            thread::sleep(Duration::from_secs(1));
+            // tokio::time::sleep(Duration::from_secs(1));
 
             // Set the root
             //
-
+            if self.config.use_stdout == true {
+                log_info!("This is where I print the dwm bar string.");
+            } else {
+                log_info!("This is where I set the dwm bar string.");
+            }
         }
 
         self.is_running = false;
@@ -218,6 +230,7 @@ impl<'core> MandwmCore<'core> {
 impl<'core> Default for MandwmCore<'core> {
     fn default() -> Self {
         MandwmCore {
+            config: Default::default(),
             dwm_bar_string: Vec::new(),
             delimiter: " | ".to_string(),
             shell_scripts: vec![],
@@ -232,11 +245,21 @@ impl<'core> Default for MandwmCore<'core> {
 #[derive(Debug, Copy, Clone)]
 pub struct MandwmConfig {
     pub display_var: &'static str,
+    pub use_stdout: bool,
 }
 
 impl std::fmt::Display for MandwmConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "DISPLAY: {}", self.display_var)
+    }
+}
+
+impl Default for MandwmConfig {
+    fn default() -> Self {
+        Self {
+            use_stdout: false,
+            display_var: "",
+        }
     }
 }
 

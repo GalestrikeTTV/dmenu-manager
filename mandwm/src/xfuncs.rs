@@ -85,6 +85,11 @@ pub fn xdisplay_set_root(name: String, display_var: &'static str) -> Result<(), 
     let display = xdisplay_connect(display_var).unwrap();
 
     let null_term_name = CString::new(name).unwrap();
+
+    // This SHOULD work without destructing the connection every time.
+    // I think it's because the X server doesn't flush the queue until
+    // the screen is disconnected.
+    // TODO find a way to flush the X queue manually.
     unsafe {
         let res = XStoreName(
             display.get_display(),

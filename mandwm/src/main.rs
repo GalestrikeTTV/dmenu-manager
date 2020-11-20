@@ -74,7 +74,9 @@ fn mandwm_run(mandwm: &mut MandwmCore, config: &MandwmConfig) {
 }
 
 fn mandwm_handle_args() -> Result<MandwmConfig, MandwmError> {
-    let mut config = MandwmConfig { display_var: "" };
+    let mut config = MandwmConfig { display_var: "", use_stdout: false };
+
+    let args: Vec<String> = std::env::args().collect();
 
     let display = env!("DISPLAY");
 
@@ -85,6 +87,13 @@ fn mandwm_handle_args() -> Result<MandwmConfig, MandwmError> {
     } else {
         config.display_var = display;
         log_debug!(display);
+    }
+
+    for arg in args {
+        // Route to stdout instead of xsetroot
+        if arg == "--stdout" || arg == "-s" {
+                config.use_stdout = true;
+        }
     }
 
     Ok(config)
