@@ -25,15 +25,18 @@ pub enum AppendTo {
 }
 
 #[derive(Debug)]
-pub struct MandwmCore<'core> {
+pub struct MandwmCore{
     config: MandwmConfig,
     /// A cached version of what's on the dwm bar.
     // Might need to wrap this for clarity
     dwm_bar_string: Vec<String>,
     /// Commands that run on their specified timers.
-    shell_scripts: Vec<MandwmCommand<'core>>,
+    shell_scripts: Vec<MandwmCommand>,
     /// The delimiter between the output of each shell script.
     delimiter: String,
+    // TODO remove this in favor of Arc<Mutex<bool>> so it can be shared.
+    // Actually the struct might want to be wrapped instead so that it can be
+    // accessed and have its values changed by the dbus daemon.
     pub is_running: bool,
     /// States whether or not the app needs to be cleaned up. Useful for checking whether or not a
     /// dbus message has been sent to shut down the daemon.
@@ -41,9 +44,10 @@ pub struct MandwmCore<'core> {
     /// The maximum length of the string that mandwm will send to xsetroot.
     max_length: usize,
 }
+unsafe impl Send for MandwmCore {}
 
-impl<'core> MandwmCore<'core> {
-    pub fn setup_mandwm() -> Result<MandwmCore<'core>, Box<dyn std::error::Error>> {
+impl MandwmCore {
+    pub fn setup_mandwm() -> Result<MandwmCore, Box<dyn std::error::Error>> {
         // TODO We'll do something with this later, just to make sure we're running as daemon or something.
         let _args: Vec<String> = std::env::args().collect();
 
@@ -54,61 +58,52 @@ impl<'core> MandwmCore<'core> {
     }
 
     // TODO I need to multithread this instead.
-    pub async fn run(mut self, _config: &MandwmConfig) -> MandwmRunner {
-        let mut is_running = false;
-
-        // Temporary cloning until the program is rewritten to use Arc<Mutex>
-        // instead of just the raw MandwmCore type.
-        // TODO reimplement everything in Arc<Mutex>
-        let cloned = self.clone();
-        let handle = tokio::spawn(async {
-            return cloned.internal_run();
+    pub fn run(mut self, _config: &MandwmConfig) -> MandwmRunner {
+        // let mut is_running = false;
+        
+        let is_running = Arc::new(Mutex::new(false));
+        let running = is_running.clone();
+        let handle = tokio::spawn(async move {
+            self.internal_run(is_running).await
         });
 
-        let result = handle.await.unwrap();
-        
-        // MandwmRunner {internal: internal_run }
-        MandwmRunner {}
+        MandwmRunner { handle, is_running: running }
     }
 
-    async fn internal_run(mut self) -> std::result::Result<(), MandwmError> {
-        self.is_running = true;
-
+    async fn internal_run(&mut self, is_running: Arc<Mutex< bool>>) -> std::result::Result<(), MandwmError> {
+        *is_running.lock().unwrap() = true;
         log_info!("Starting mandwm.");
 
-        while self.is_running {
-            // Spin off a thread that checks for dbus messages
-            // (Maybe not even spin off a thread? Dunno if it blocks
-
+        while *is_running.lock().unwrap() {
             // Check for the timer to see if we should output the bar
             // Execute bar scripts
 
-            // Error checking
+            // Example error checking
             if false {
                 return Err(MandwmError::critical(String::from("Mandwm has crashed!")));
             }
 
             log_debug!("Mandwm main event loop!");
 
-            // tokio::time::sleep(Duration::from_secs(1));
+            tokio::time::sleep(Duration::from_secs(1)).await;
 
             // Set the root
-            //
             if self.config.use_stdout == true {
-                log_info!("This is where I print the dwm bar string.");
+                log_info!("This is where I PRINT the dwm bar string.");
             } else {
-                log_info!("This is where I set the dwm bar string.");
+                log_info!("This is where I SET the dwm bar string.");
             }
         }
 
-        self.is_running = false;
+        *is_running.lock().unwrap() = false;
         log_info!("Mandwm has finished running");
 
         Ok(())
     }
 
     /// Sets up the DBUS/TCP connection.
-    #[allow(unused_mut)] // TODO remove this
+    #[allow(unused_mut)]
+    // TODO remove this and replace it in main.rs so it can run in its own thread.
     pub fn connect(mut self) -> Result<Self, MandwmError> {
         // Connect to DBUS
         let conn = LocalConnection::new_session().unwrap();
@@ -227,7 +222,7 @@ impl<'core> MandwmCore<'core> {
     }
 }
 
-impl<'core> Default for MandwmCore<'core> {
+impl Default for MandwmCore {
     fn default() -> Self {
         MandwmCore {
             config: Default::default(),
@@ -264,14 +259,14 @@ impl Default for MandwmConfig {
 }
 
 #[derive(Debug)]
-struct MandwmCommand<'comm> {
+struct MandwmCommand {
     name: std::ffi::OsString,
     script: Command,
-    path: &'comm Path,
+    path: &'static Path,
 }
 
-impl<'comm> MandwmCommand<'comm> {
-    pub fn set_name(&mut self, name: &'comm str) {
+impl MandwmCommand {
+    pub fn set_name(&mut self, name: &str) {
         self.name = name.into();
     }
 
