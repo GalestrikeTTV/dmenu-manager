@@ -81,10 +81,13 @@ pub fn xdisplay_fast_set_root(name: String, display: &MandwmDisplay) -> Result<(
 }
 
 /// Replacement for xsetroot which is about 1.5x faster in Rust since we aren't spawning a shell
-pub fn xdisplay_set_root(name: String, display_var: &'static str) -> Result<(), MandwmError> {
+pub fn xdisplay_set_root<T: Into<String>>(
+    name: T,
+    display_var: &'static str,
+) -> Result<(), MandwmError> {
     let display = xdisplay_connect(display_var).unwrap();
 
-    let null_term_name = CString::new(name).unwrap();
+    let null_term_name = CString::new(name.into()).unwrap();
 
     // This SHOULD work without destructing the connection every time.
     // I think it's because the X server doesn't flush the queue until

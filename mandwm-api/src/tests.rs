@@ -1,4 +1,3 @@
-
 #[test]
 fn primary_string_test() -> Result<(), std::io::Error> {
     // here we want to make sure that we can send a primary string to dbus

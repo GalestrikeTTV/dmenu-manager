@@ -1,8 +1,7 @@
-
 //! # WARNING: This crate is currently unimplemented.
 //! The purpose of this crate is to be a layer around the mandwm-api crate and produce C static
 //! libs and dynamic libs.
-//! 
+//!
 //! Things to be done:
 //!
 //! * Generate C headers procedurally
@@ -12,4 +11,6 @@
 //! xlib and dbus stuff. Might be better to write the ffi in C.
 
 /// Obviously not the way things are going to be handled
-pub fn gen_libs() { panic!("Please read the crate description before using the ffi.") }
+pub fn gen_libs() {
+    panic!("Please read the crate description before using the ffi.")
+}

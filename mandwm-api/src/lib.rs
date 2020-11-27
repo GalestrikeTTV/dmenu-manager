@@ -75,8 +75,8 @@ pub mod error {
 
     #[derive(Debug)]
     pub struct MandwmError {
-        msg: String,
-        level: MandwmErrorLevel,
+        pub msg: String,
+        pub level: MandwmErrorLevel,
     }
 
     impl MandwmError {

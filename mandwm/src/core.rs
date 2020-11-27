@@ -14,7 +14,7 @@ use std::time::Duration;
 use x11::xlib::*;
 
 use crate::{dbus::*, xfuncs::*};
-use mandwm_api::{ log::*, error::*};
+use mandwm_api::{error::*, log::*};
 
 #[derive(Debug)]
 pub enum AppendTo {
@@ -25,10 +25,12 @@ pub enum AppendTo {
 }
 
 #[derive(Debug)]
-pub struct MandwmCore{
+pub struct MandwmCore {
     config: MandwmConfig,
     /// A cached version of what's on the dwm bar.
     // Might need to wrap this for clarity
+    // TODO make this a local variable in the run function
+    // so that MandwmCore can be more easily accessed through a Mutex
     dwm_bar_string: Vec<String>,
     /// Commands that run on their specified timers.
     shell_scripts: Vec<MandwmCommand>,
@@ -58,19 +60,26 @@ impl MandwmCore {
     }
 
     // TODO I need to multithread this instead.
-    pub fn run(mut self, _config: &MandwmConfig) -> MandwmRunner {
+    pub fn run(self, _config: &MandwmConfig) -> MandwmRunner {
         // let mut is_running = false;
-        
+
         let is_running = Arc::new(Mutex::new(false));
         let running = is_running.clone();
-        let handle = tokio::spawn(async move {
-            self.internal_run(is_running).await
-        });
+        let handle = tokio::spawn(async move { self.internal_run(is_running).await });
 
-        MandwmRunner { handle, is_running: running }
+        MandwmRunner {
+            handle,
+            is_running: running,
+        }
     }
 
-    async fn internal_run(&mut self, is_running: Arc<Mutex< bool>>) -> std::result::Result<(), MandwmError> {
+    async fn internal_run(
+        mut self,
+        is_running: Arc<Mutex<bool>>,
+    ) -> std::result::Result<(), MandwmError> {
+        use crate::xfuncs::*;
+        use std::collections::HashMap;
+
         *is_running.lock().unwrap() = true;
         log_info!("Starting mandwm.");
 
@@ -85,13 +94,39 @@ impl MandwmCore {
 
             log_debug!("Mandwm main event loop!");
 
+            let mut bar_string: HashMap<String, String> = HashMap::new();
+
+            for script in self.shell_scripts.iter_mut() {
+                let res = script.output();
+                match res {
+                    Ok(v) => {
+                        log_debug!(v);
+                        bar_string.insert(script.name.to_str().unwrap().into(), v);
+                    }
+                    Err(e) => log_warn!(
+                        "There is an issue running {}. Message: {}",
+                        script.name.to_str().unwrap(),
+                        e.msg
+                    ),
+                }
+            }
+
             tokio::time::sleep(Duration::from_secs(1)).await;
 
             // Set the root
             if self.config.use_stdout == true {
-                log_info!("This is where I PRINT the dwm bar string.");
+                // Display to stdout
+                for output in bar_string.iter() {
+                    log_info!("{}", output.0);
+                }
             } else {
-                log_info!("This is where I SET the dwm bar string.");
+                // Use xsetroot
+                let mut bar = String::new();
+                for output in bar_string.iter() {
+                    bar.push_str(output.1);
+                    bar.push('|');
+                }
+                xdisplay_set_root(bar, self.config.display_var).unwrap();
             }
         }
 
@@ -283,8 +318,8 @@ impl MandwmCommand {
                     Ok(out)
                 } else {
                     Err(MandwmError::warn(format!(
-                        "Error executing command.\nName: {:?}\nSTDERR: {}",
-                        self.name, err
+                        "Error executing command.\nName: {:?}\nSTDERR: {}\nSTDOUT: {}\nSTATUS: {}",
+                        self.name, err, out, v.status
                     )))
                 }
             }

@@ -19,7 +19,7 @@ use crate::{
     core::{AppendTo::*, *},
     xfuncs::*,
 };
-pub use mandwm_api::{ log::*, error::*};
+pub use mandwm_api::{error::*, log::*};
 use std::{
     path::Path,
     process::{Command, Stdio},
@@ -44,20 +44,26 @@ async fn main() {
     // the dbus and 'should close' variables
     // mandwm_run(&mut mandwm, &config);
     let runner = mandwm.run(&config);
-    
+
     // THIS CODE IS REACHED BEFORE THE RUNNER ACTUALLY STARTS
     while runner.is_running.lock().unwrap().eq(&true) {
         // lock should be dropped by now if not already
-        
+
         // Check dbus
     }
 
-    runner.handle.await.expect("There was a problem with the thread")
+    runner
+        .handle
+        .await
+        .expect("There was a problem with the thread")
         .expect("There was an error running the core loop.");
 }
 
 fn mandwm_handle_args() -> Result<MandwmConfig, MandwmError> {
-    let mut config = MandwmConfig { display_var: "", use_stdout: false };
+    let mut config = MandwmConfig {
+        display_var: "",
+        use_stdout: false,
+    };
 
     let args: Vec<String> = std::env::args().collect();
 
